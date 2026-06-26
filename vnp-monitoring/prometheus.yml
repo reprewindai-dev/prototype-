@@ -1,0 +1,44 @@
+# Prometheus Global Configuration for Veklom Nexus Protocol (VNP) Observability
+
+global:
+  scrape_interval: 5s # High-precision 5s scrape interval to capture transient tail latency spikes
+  evaluation_interval: 5s # Query rules consistently for microsecond alerts
+  scrape_timeout: 4s
+
+  external_labels:
+    monitor: 'vnp-consensus-mesh'
+    datacenter: 'global-network'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'alertmanager:9093'
+
+# Rules files specifying latency and throughput alerts
+rule_files:
+  - "alert.rules.yml"
+
+scrape_configs:
+  # 1. VNP Edge Consensing Node Agent
+  - job_name: 'vnp-measurement-probes'
+    scrape_interval: 2s # Scrape probes with sub-second resolution for real-time p99 indexing
+    metrics_path: '/api/v1/metrics/prometheus'
+    static_configs:
+      - targets: ['localhost:3000']
+        labels:
+          environment: 'production'
+          tier: 'probe-aggregator'
+
+  # 2. Kubernetes Core Pod Autoscaler Aggregators (HPA)
+  - job_name: 'kubernetes-cadvisor'
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)

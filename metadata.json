@@ -1,0 +1,6 @@
+{
+  "name": "VNP Benchmark Dashboard",
+  "description": "Veklom Nexus Protocol: The global real-time API benchmarking, latency heatmap, and M2M compliance standard for autonomous agent commerce.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

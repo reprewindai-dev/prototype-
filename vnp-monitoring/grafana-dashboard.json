@@ -1,0 +1,82 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": 100,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "VNP p99 Global Tail Latency Heatmap (ms)",
+      "type": "heatmap",
+      "datasource": { "type": "prometheus", "uid": "prom-vnp" },
+      "targets": [
+        {
+          "expr": "vnp_probe_latency_milliseconds_bucket{percentile=\"p99\"}",
+          "format": "heatmap",
+          "legendFormat": "{{region}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "color": { "mode": "scheme", "scheme": "Spectral" },
+        "yAxis": { "format": "ms" }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 7 },
+      "id": 2,
+      "title": "Throughput Concurrency (Requests/sec)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(vnp_throughput_rps_count) by (api_did)",
+          "legendFormat": "{{api_did}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": ["max", "mean"] }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 7 },
+      "id": 3,
+      "title": "M2M x402 Trust Escrow Signatures - Active Quorum Status",
+      "type": "gauge",
+      "targets": [
+        {
+          "expr": "vnp_consensus_verifying_nodes_count",
+          "legendFormat": "Verification Quorum Nodes",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "red", "value": null },
+            { "color": "orange", "value": 5 },
+            { "color": "green", "value": 12 }
+          ]
+        }
+      }
+    }
+  ],
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["vnp", "production", "observability"],
+  "time": { "from": "now-15m", "to": "now" },
+  "timezone": "browser",
+  "title": "Veklom Nexus Protocol Performance Tracker",
+  "version": 1
+}
