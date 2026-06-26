@@ -16,7 +16,9 @@ import {
   Shield,
   FileCheck,
   AlertTriangle,
-  Radio
+  Radio,
+  Flame,
+  Sliders
 } from "lucide-react";
 
 import { ApiState, AlertConfig, AlertLog, AuditLog } from "./types";
@@ -27,9 +29,10 @@ import AlertPanel from "./components/AlertPanel";
 import RbacPanel from "./components/RbacPanel";
 import AiAdvisorPanel from "./components/AiAdvisorPanel";
 import NetworkTopologyPanel from "./components/NetworkTopologyPanel";
+import LoadTestingPanel from "./components/LoadTestingPanel";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"benchmark" | "k8s" | "spec" | "rbac" | "alerts" | "advisor" | "topology">("topology");
+  const [activeTab, setActiveTab] = useState<"benchmark" | "k8s" | "spec" | "rbac" | "alerts" | "advisor" | "topology" | "loadtest">("topology");
   
   // States loaded from backend REST Endpoints
   const [apis, setApis] = useState<ApiState[]>([]);
@@ -444,6 +447,18 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => setActiveTab("loadtest")}
+                className={`flex-1 min-w-[130px] flex items-center justify-center gap-2 p-3.5 rounded-xl font-extrabold transition-all border cursor-pointer select-none ${
+                  activeTab === "loadtest"
+                    ? "bg-[#101622] border-emerald-500/50 text-emerald-400 shadow-md"
+                    : "bg-transparent border-transparent text-slate-400 hover:bg-slate-950/50 hover:text-white"
+                }`}
+              >
+                <Flame className="w-4 h-4 text-emerald-400" />
+                <span>SLA Swarm Load Test</span>
+              </button>
+
+              <button
                 onClick={() => setActiveTab("alerts")}
                 className={`flex-1 min-w-[130px] flex items-center justify-center gap-2 p-3.5 rounded-xl font-extrabold transition-all border cursor-pointer select-none ${
                   activeTab === "alerts"
@@ -508,6 +523,8 @@ export default function App() {
                     )}
 
                     {activeTab === "k8s" && <K8sAutoscalingPanel />}
+
+                    {activeTab === "loadtest" && <LoadTestingPanel />}
 
                     {activeTab === "spec" && <SpecPanel />}
 
