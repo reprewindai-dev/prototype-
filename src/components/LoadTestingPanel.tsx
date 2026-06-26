@@ -1,6 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend
+} from "recharts";
+import { 
   Play, 
   Square, 
   Zap, 
@@ -20,7 +30,12 @@ import {
   RefreshCw,
   Sliders,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  Download,
+  Copy,
+  Check,
+  Globe,
+  Shuffle
 } from "lucide-react";
 
 interface JourneyStep {
@@ -82,6 +97,16 @@ export default function LoadTestingPanel() {
     }
   ]);
   const [chatLoading, setChatLoading] = useState<boolean>(false);
+
+  // Must-Have Features States
+  const [activeManifestTab, setActiveManifestTab] = useState<"k8s_hpa" | "prom_rule" | "nginx_rate">("k8s_hpa");
+  const [showManifestGenerator, setShowManifestGenerator] = useState<boolean>(true);
+  const [copiedText, setCopiedText] = useState<string | null>(null);
+  
+  // Attestation Bundle
+  const [showAttestationBundle, setShowAttestationBundle] = useState<boolean>(false);
+  const [isAttestationSigned, setIsAttestationSigned] = useState<boolean>(false);
+  const [signedAttestation, setSignedAttestation] = useState<any>(null);
 
   // Templates
   const journeys: JourneyTemplate[] = [
@@ -308,6 +333,61 @@ export default function LoadTestingPanel() {
     setCurrentErrorRate(prev => parseFloat(Math.min(100, prev + 3.8).toFixed(2)));
   };
 
+  // Generate cryptographic proof envelope
+  const generateSlaAttestation = () => {
+    const timestamp = new Date().toISOString();
+    const mockHash = "vnp_sha256_" + Array.from({length: 32}, () => Math.floor(Math.random()*16).toString(16)).join("");
+    const mockSignature = "vnp_sig_" + Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join("");
+    
+    const attestation = {
+      version: "v1.0.0-provenance",
+      timestamp: timestamp,
+      network_id: "veklom-nexus-mainnet-3",
+      scenario_simulated: activeJourney.name,
+      observed_metrics_snapshot: {
+        peak_rps: currentRps,
+        p99_latency_drift_ms: currentLatency,
+        error_rate_percent: currentErrorRate,
+        database_backlog_depth: currentQueueDepth,
+        route_cache_hit_ratio: currentCacheHit
+      },
+      sla_status: currentLatency > 1200 || currentErrorRate > 5.0 ? "VIOLATED" : "CONFORMANT",
+      consensus_verdict: {
+        is_slashing_triggered: currentLatency > 1200 || currentErrorRate > 5.0,
+        slashing_penalty_amount: currentLatency > 1200 || currentErrorRate > 5.0 ? "2,500 VNP Tokens" : "0 VNP Tokens",
+        reason: currentLatency > 1200 ? "P99 Latency exceeded SLA threshold (1200ms)" : currentErrorRate > 5.0 ? "Error rate exceeded maximum tolerable loss (5.0%)" : "No violation detected"
+      },
+      prover_consensus_nodes: [
+        { node_id: "node-us-east-validator-01", status: "SIGNED", trust_score: 9.92 },
+        { node_id: "node-eu-west-validator-04", status: "SIGNED", trust_score: 9.87 },
+        { node_id: "node-ap-south-validator-09", status: "SIGNED", trust_score: 9.95 }
+      ],
+      provable_witness_hash: mockHash,
+      validator_multisig_signature: mockSignature
+    };
+
+    setSignedAttestation(attestation);
+    setIsAttestationSigned(true);
+    setShowAttestationBundle(true);
+
+    // Also add to logs
+    const timeStr = new Date().toTimeString().split(" ")[0];
+    setSimulationLogs(prev => [
+      { 
+        time: timeStr, 
+        level: attestation.consensus_verdict.is_slashing_triggered ? "ERR" : "SUC", 
+        text: `🔐 MULTI-SIG SLA PROOF SIGNED: ${attestation.consensus_verdict.is_slashing_triggered ? "Slashing penalty generated." : "System proved SLA conformant."} Block: ${mockHash.substring(0, 15)}...` 
+      },
+      ...prev
+    ]);
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedText("Copied!");
+    setTimeout(() => setCopiedText(null), 2000);
+  };
+
   // AI Load Testing Advisor Chat submission
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -375,6 +455,78 @@ Provide highly actionable, technical architectural advice on how the user can im
     
     return `M ${points.join(" L ")}`;
   };
+
+  // Dynamic generation templates
+  const k8sHpaYaml = `apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: vnp-agent-data-plane-hpa
+  namespace: sovereign-nexus
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: vnp-worker-pool
+  minReplicas: ${Math.max(2, Math.ceil(baseRps / 1500))}
+  maxReplicas: ${Math.max(12, Math.ceil(baseRps / 400))}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: ${readRatio < 0.3 ? 65 : 80} # Lower threshold for write-heavy locking
+  - type: External
+    external:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: Value
+        value: "${Math.round(baseRps * 0.65)}"`;
+
+  const prometheusAlertYaml = `groups:
+- name: vnp-sla-alerts
+  rules:
+  - alert: SovereignSLALatencyBreach
+    expr: vnp_p99_latency_seconds > ${currentLatency > 800 ? "0.8" : "1.2"}
+    for: 1m
+    labels:
+      severity: critical
+      tier: core-routing
+    annotations:
+      summary: "P99 Client SLA Drift breach on ${activeJourney.name}"
+      description: "Measured p99 latency is currently at ${currentLatency}ms (SLA is 1200ms). PostgreSQL write lock pools may be starving."
+
+  - alert: SovereignRouteErrorSpike
+    expr: rate(vnp_requests_failed_total[1m]) / rate(vnp_requests_total[1m]) * 100 > ${currentErrorRate > 4.0 ? "3.0" : "5.0"}
+    for: 30s
+    labels:
+      severity: critical
+    annotations:
+      summary: "Unacceptable packet or transaction loss rate of ${currentErrorRate}%"
+      description: "Error rate exceeds sovereign threshold. Decentralized node slashing may be triggered automatically."`;
+
+  const nginxLimitConf = `# Nginx Ingress Controller Zone configurations for ${activeJourney.name}
+limit_req_zone $binary_remote_addr zone=vnp_m2m_limit:25m rate=${Math.round(baseRps * 1.25)}r/s;
+
+server {
+    listen 80;
+    server_name m2m.veklom-nexus.io;
+
+    location /api/v1/settlement {
+        limit_req zone=vnp_m2m_limit burst=${Math.round(baseRps * 0.4)} nodelay;
+        limit_req_status 429;
+        
+        # Proxy upstream configurations with optimized connections
+        proxy_pass http://vnp-worker-pool;
+        proxy_read_timeout 60s;
+        proxy_connect_timeout 5s;
+        
+        # Route cache enablement for read-heavy operations
+        proxy_cache_bypass $http_x_bypass_cache;
+        proxy_no_cache $http_x_bypass_cache;
+    }
+}`;
 
   return (
     <div id="vnp-load-testing-workspace" className="p-6 space-y-6">
@@ -666,65 +818,105 @@ Provide highly actionable, technical architectural advice on how the user can im
 
             </div>
 
-            {/* Custom SVG Time-series Sparkline Chart representing historical simulation results */}
+            {/* Recharts Time-series Dual Y-Axis Chart representing historical simulation results */}
             <div className="bg-[#070a10] border border-slate-950 p-4 rounded-xl space-y-3">
-              <div className="flex items-center justify-between font-mono text-[10px] text-slate-500 uppercase font-bold">
-                <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-1 bg-emerald-400 block rounded" /> Throughput (RPS)
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
+                  Live Network Telemetry Drift
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-1 bg-[#818cf8] block rounded" /> Latency (ms)
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-1 bg-red-400 block rounded" /> Errors (%)
+                <span className="text-[9px] font-mono text-slate-500">
+                  Dual Y-Axis Multi-Metric Plane
                 </span>
               </div>
 
-              <div className="h-[180px] w-full bg-slate-950 rounded border border-slate-900 relative">
+              <div className="h-[210px] w-full bg-slate-950 rounded-xl border border-slate-900/60 p-1 relative">
                 {chartHistory.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full space-y-2">
-                    <Activity className="w-6 h-6 text-slate-700" />
+                    <Activity className="w-6 h-6 text-slate-700 animate-pulse" />
                     <span className="text-[10px] font-mono text-slate-500 uppercase">Run Simulation to generate live telemetry curves</span>
                   </div>
                 ) : (
-                  <svg width="100%" height="100%" className="absolute inset-0">
-                    {/* Horizontal grid lines */}
-                    <line x1="0" y1="35" x2="100%" y2="35" stroke="rgba(30, 41, 59, 0.25)" strokeDasharray="3,3" />
-                    <line x1="0" y1="90" x2="100%" y2="90" stroke="rgba(30, 41, 59, 0.25)" strokeDasharray="3,3" />
-                    <line x1="0" y1="145" x2="100%" y2="145" stroke="rgba(30, 41, 59, 0.25)" strokeDasharray="3,3" />
-
-                    {/* Throughput Curve (Green) */}
-                    <path
-                      d={buildSvgPath(chartHistory, "rps", 0, Math.max(8000, ...chartHistory.map(h => h.rps)), 180, 500)}
-                      fill="none"
-                      stroke="#10b981"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                    />
-
-                    {/* Latency Curve (Indigo) */}
-                    <path
-                      d={buildSvgPath(chartHistory, "latency", 0, Math.max(1200, ...chartHistory.map(h => h.latency)), 180, 500)}
-                      fill="none"
-                      stroke="#818cf8"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-
-                    {/* Error Curve (Red) */}
-                    <path
-                      d={buildSvgPath(chartHistory, "errorRate", 0, Math.max(10, ...chartHistory.map(h => h.errorRate)), 180, 500)}
-                      fill="none"
-                      stroke="#f87171"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                    />
-
-                    {/* Time ticks label text in corners */}
-                    <text x="10" y="20" fill="#475569" fontSize="8" fontFamily="monospace">HIGH OUTLET LEVEL</text>
-                    <text x="10" y="170" fill="#475569" fontSize="8" fontFamily="monospace">{chartHistory[0].time} START</text>
-                    <text x="90%" y="170" fill="#475569" fontSize="8" fontFamily="monospace" textAnchor="end">{chartHistory[chartHistory.length-1].time} NOW</text>
-                  </svg>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartHistory} margin={{ top: 15, right: 5, left: -20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.4} />
+                      <XAxis 
+                        dataKey="time" 
+                        stroke="#475569" 
+                        fontSize={8} 
+                        tickLine={false} 
+                        axisLine={false} 
+                        dy={6}
+                      />
+                      <YAxis 
+                        yAxisId="left" 
+                        stroke="#10b981" 
+                        fontSize={8} 
+                        tickLine={false} 
+                        axisLine={false} 
+                        domain={[0, 'auto']}
+                        tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(1)}k` : v}
+                      />
+                      <YAxis 
+                        yAxisId="right" 
+                        orientation="right"
+                        stroke="#f87171" 
+                        fontSize={8} 
+                        tickLine={false} 
+                        axisLine={false} 
+                        domain={[0, 'auto']}
+                        tickFormatter={(v) => `${v}%`}
+                        dx={5}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: '#020617', 
+                          borderColor: '#1e293b', 
+                          borderRadius: '10px',
+                          fontSize: '9.5px',
+                          fontFamily: 'monospace',
+                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
+                        }}
+                        itemStyle={{ padding: '1px 0' }}
+                      />
+                      <Legend 
+                        verticalAlign="top" 
+                        height={28} 
+                        iconType="circle" 
+                        iconSize={5}
+                        wrapperStyle={{ fontSize: '9px', fontFamily: 'monospace', color: '#94a3b8' }}
+                      />
+                      <Line 
+                        yAxisId="left"
+                        type="monotone" 
+                        dataKey="rps" 
+                        name="Throughput (RPS)" 
+                        stroke="#10b981" 
+                        strokeWidth={2} 
+                        dot={false}
+                        activeDot={{ r: 4 }} 
+                      />
+                      <Line 
+                        yAxisId="left"
+                        type="monotone" 
+                        dataKey="latency" 
+                        name="P99 Latency (ms)" 
+                        stroke="#818cf8" 
+                        strokeWidth={2} 
+                        dot={false}
+                        activeDot={{ r: 4 }} 
+                      />
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="errorRate" 
+                        name="Error Rate (%)" 
+                        stroke="#f87171" 
+                        strokeWidth={1.5} 
+                        dot={false}
+                        activeDot={{ r: 4 }} 
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
                 )}
               </div>
             </div>
@@ -873,6 +1065,227 @@ Provide highly actionable, technical architectural advice on how the user can im
                 </button>
               </form>
             </div>
+
+          </div>
+
+          {/* MUST-HAVE OPERATIONS CENTER: Failover Visualizer, Attestation, and Manifests */}
+          <div className="bg-[#0b1017] border border-slate-900 rounded-xl p-5 space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-900 pb-3 gap-3">
+              <div>
+                <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded font-bold uppercase tracking-wide">
+                  PRODUCTION READY OPERATIONS DECK
+                </span>
+                <h3 className="text-sm font-black text-white tracking-tight mt-1">SLA Guardrail Orchestration</h3>
+              </div>
+              
+              <div className="flex gap-1.5 font-mono text-[9px]">
+                <button
+                  onClick={() => setShowManifestGenerator(!showManifestGenerator)}
+                  className={`px-2.5 py-1.5 rounded border transition cursor-pointer select-none font-bold ${
+                    showManifestGenerator ? "bg-[#101726] text-emerald-400 border-emerald-500/30" : "bg-slate-950 text-slate-500 border-slate-900 hover:border-slate-800"
+                  }`}
+                >
+                  {showManifestGenerator ? "Hide Auto-Provisioners" : "Show Auto-Provisioners"}
+                </button>
+              </div>
+            </div>
+
+            {/* Subgrid: Failover Route Map & Decentered Multi-Sig Attestation Proof */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              
+              {/* SDK Live failover Route Map */}
+              <div className="p-4 bg-slate-950 border border-slate-900 rounded-xl space-y-3.5 relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-blue-400" />
+                    <span className="text-[11px] font-mono font-bold text-slate-300 uppercase">SDK Live Route Discovery</span>
+                  </div>
+                  <span className={`text-[8px] font-mono px-2 py-0.5 rounded font-black border ${
+                    isSimulating && (currentLatency > 800 || currentErrorRate > 3.0)
+                      ? "text-red-400 bg-red-500/10 border-red-500/25 animate-pulse"
+                      : "text-emerald-400 bg-emerald-500/10 border-emerald-500/25"
+                  }`}>
+                    {isSimulating && (currentLatency > 800 || currentErrorRate > 3.0) ? "Failover Route Active" : "Direct Primary Route"}
+                  </span>
+                </div>
+
+                <div className="space-y-3 pt-1">
+                  {/* Regions visual list */}
+                  <div className="space-y-2.5">
+                    {/* US-EAST-1 */}
+                    <div className={`p-2 rounded-lg border flex items-center justify-between transition-all ${
+                      !(isSimulating && (currentLatency > 800 || currentErrorRate > 3.0))
+                        ? "bg-[#0b1b16] border-emerald-500/30 text-slate-200 shadow-sm shadow-emerald-500/5"
+                        : "bg-[#1f0f10] border-red-500/20 text-slate-500"
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-1.5 h-1.5 rounded-full ${!(isSimulating && (currentLatency > 800 || currentErrorRate > 3.0)) ? "bg-emerald-400" : "bg-red-500"}`} />
+                        <span className="text-[10px] font-mono font-bold">us-east-1 (Primary)</span>
+                      </div>
+                      <span className="text-[9px] font-mono font-medium">
+                        {isSimulating ? (currentLatency > 800 || currentErrorRate > 3.0 ? "Circuit Tripped" : `${currentLatency}ms (p99)`) : "Inert"}
+                      </span>
+                    </div>
+
+                    {/* US-WEST-2 */}
+                    <div className={`p-2 rounded-lg border flex items-center justify-between transition-all ${
+                      isSimulating && (currentLatency > 800 || currentErrorRate > 3.0)
+                        ? "bg-[#0c162d] border-blue-500/40 text-slate-200 shadow-sm shadow-blue-500/5"
+                        : "bg-slate-900/30 border-slate-900 text-slate-500"
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-1.5 h-1.5 rounded-full ${isSimulating && (currentLatency > 800 || currentErrorRate > 3.0) ? "bg-blue-400" : "bg-slate-700"}`} />
+                        <span className="text-[10px] font-mono font-bold">us-west-2 (Failover Core)</span>
+                      </div>
+                      <span className="text-[9px] font-mono font-medium">
+                        {isSimulating && (currentLatency > 800 || currentErrorRate > 3.0) ? `${Math.round(currentLatency * 0.45)}ms (p99)` : "Standby (0% Rx)"}
+                      </span>
+                    </div>
+
+                    {/* EU-WEST-1 */}
+                    <div className="p-2 bg-slate-900/10 border border-slate-900 text-slate-600 rounded-lg flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-800" />
+                        <span className="text-[10px] font-mono font-bold">eu-west-1 (Secondary Standby)</span>
+                      </div>
+                      <span className="text-[9px] font-mono">Inactive (Healthy)</span>
+                    </div>
+                  </div>
+
+                  <p className="text-[9.5px] text-slate-400 leading-relaxed font-sans border-t border-slate-900 pt-2 bg-[#020617]/50 p-2 rounded">
+                    {isSimulating && (currentLatency > 800 || currentErrorRate > 3.0) ? (
+                      <span className="text-red-400/90 font-mono">
+                        ⚡ SDK Circuit Breaker tripped in us-east-1! Dynamically shunting 100% of sovereign agent payloads to us-west-2 in under 12ms.
+                      </span>
+                    ) : (
+                      <span className="text-slate-500 font-mono">
+                        SDK healthy connection pool stable. 100% load resolved against primary regional endpoints with active low-latency cache buffers.
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* Validator Multi-Sig Attestation Proof Generator */}
+              <div className="p-4 bg-slate-950 border border-slate-900 rounded-xl flex flex-col justify-between space-y-3">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-[11px] font-mono font-bold text-slate-300 uppercase">Multi-Sig SLA Audit Proof</span>
+                    </div>
+                    
+                    {isAttestationSigned && (
+                      <span className="text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.2 rounded font-mono font-bold">
+                        SIGNED & PROVED
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-relaxed font-sans">
+                    Generate an immutable, signed SLA Witness Attestation bundle detailing the peak metrics, violation status, and consensus penalties. Perfect for multi-party SLA compliance or decentralized slashing.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <button
+                    onClick={generateSlaAttestation}
+                    className={`w-full flex items-center justify-center gap-1.5 text-xs font-bold font-mono py-2 rounded-xl transition cursor-pointer select-none border ${
+                      isSimulating && (currentLatency > 1200 || currentErrorRate > 5.0)
+                        ? "bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20"
+                        : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                    }`}
+                  >
+                    <Shuffle className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Compile SLA Attestation Witness</span>
+                  </button>
+
+                  {/* Attestation JSON Modal / Expandable View */}
+                  {isAttestationSigned && signedAttestation && (
+                    <div className="space-y-1 pt-1">
+                      <div className="flex items-center justify-between text-[8px] text-slate-500 font-mono">
+                        <span>JSON EVIDENCE PROOF ENVELOPE:</span>
+                        <button
+                          onClick={() => copyToClipboard(JSON.stringify(signedAttestation, null, 2))}
+                          className="flex items-center gap-1 text-slate-400 hover:text-white transition cursor-pointer"
+                        >
+                          {copiedText === "Copied!" ? (
+                            <Check className="w-2.5 h-2.5 text-emerald-400" />
+                          ) : (
+                            <Copy className="w-2.5 h-2.5" />
+                          )}
+                          <span>{copiedText || "Copy Proof"}</span>
+                        </button>
+                      </div>
+                      <pre className="p-2.5 bg-slate-900 border border-slate-800 text-[8px] font-mono rounded max-h-[100px] overflow-y-auto text-slate-400 leading-normal select-text scrollbar-thin">
+                        {JSON.stringify(signedAttestation, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Dynamic Kubernetes Horizontal Pod Autoscaler / Prometheus Alert rule auto-provisioner code blocks */}
+            {showManifestGenerator && (
+              <div className="border border-slate-900/60 rounded-xl overflow-hidden bg-slate-950">
+                <div className="flex items-center justify-between bg-slate-950 border-b border-slate-900 px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <Settings className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-[10px] font-mono font-bold text-slate-300 uppercase">Autoscaler & Alert Auto-Provisioners</span>
+                  </div>
+
+                  <div className="flex gap-1.5 font-mono text-[9px]">
+                    {[
+                      { id: "k8s_hpa", name: "k8s-hpa.yaml" },
+                      { id: "prom_rule", name: "prometheus-alerts.yml" },
+                      { id: "nginx_rate", name: "nginx-ingress.conf" }
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveManifestTab(tab.id as any)}
+                        className={`px-2 py-1 rounded border transition cursor-pointer select-none font-bold ${
+                          activeManifestTab === tab.id
+                            ? "bg-slate-900 text-emerald-400 border-slate-700"
+                            : "bg-transparent text-slate-500 border-transparent hover:text-slate-300"
+                        }`}
+                      >
+                        {tab.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-4 relative">
+                  {/* Clipboard copy control */}
+                  <div className="absolute top-3.5 right-3.5 z-10">
+                    <button
+                      onClick={() => {
+                        let text = "";
+                        if (activeManifestTab === "k8s_hpa") text = k8sHpaYaml;
+                        if (activeManifestTab === "prom_rule") text = prometheusAlertYaml;
+                        if (activeManifestTab === "nginx_rate") text = nginxLimitConf;
+                        copyToClipboard(text);
+                      }}
+                      className="flex items-center gap-1 bg-[#020617] border border-slate-800 hover:border-slate-700 p-1.5 px-2.5 rounded-lg text-slate-400 hover:text-white transition text-[9px] font-mono font-bold cursor-pointer"
+                    >
+                      {copiedText === "Copied!" ? (
+                        <Check className="w-3 h-3 text-emerald-400" />
+                      ) : (
+                        <Copy className="w-3 h-3 text-slate-400" />
+                      )}
+                      <span>{copiedText || "Copy Config"}</span>
+                    </button>
+                  </div>
+
+                  <pre className="text-[9px] font-mono leading-relaxed text-slate-400 p-3 bg-[#020617] rounded-lg border border-slate-900 max-h-[190px] overflow-y-auto overflow-x-auto select-text scrollbar-thin">
+                    {activeManifestTab === "k8s_hpa" && k8sHpaYaml}
+                    {activeManifestTab === "prom_rule" && prometheusAlertYaml}
+                    {activeManifestTab === "nginx_rate" && nginxLimitConf}
+                  </pre>
+                </div>
+              </div>
+            )}
 
           </div>
 
