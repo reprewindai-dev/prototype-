@@ -261,6 +261,9 @@ export default function BenchmarkPanel({ apis, trustBeacon, blockAnchored, onRef
 
   const selectedApi = calculatedApis.find(api => api.id === selectedApiId) || calculatedApis[0];
 
+  const api1 = calculatedApis.find(a => a.id === compareApiId1) || calculatedApis[0];
+  const api2 = calculatedApis.find(a => a.id === compareApiId2) || calculatedApis[1] || calculatedApis[0];
+
   const handleSliderChange = (setter: React.Dispatch<React.SetStateAction<number>>, val: number) => {
     setter(val);
     setWeightTuned(true);
@@ -539,6 +542,7 @@ export default function BenchmarkPanel({ apis, trustBeacon, blockAnchored, onRef
           </button>
         </div>
       </div>
+    </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {filteredApis.length === 0 ? (
@@ -912,6 +916,7 @@ export default function BenchmarkPanel({ apis, trustBeacon, blockAnchored, onRef
                 placeholder="{}"
               />
             </div>
+          </div>
 
             <button
               id="vnp-execute-proxy-btn"
@@ -999,78 +1004,76 @@ export default function BenchmarkPanel({ apis, trustBeacon, blockAnchored, onRef
               </div>
             )}
           </div>
-        </div>
-
-      </div>
-
-      {/* VNP SIDE-BY-SIDE COMPARE MODAL */}
-      {isCompareModalOpen && (() => {
-        const api1 = calculatedApis.find(a => a.id === compareApiId1) || calculatedApis[0];
-        const api2 = calculatedApis.find(a => a.id === compareApiId2) || calculatedApis[1] || calculatedApis[0];
-
-        if (!api1 || !api2) return null;
-
-        return (
-          <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 md:p-6 overflow-y-auto">
-            <div className="bg-[#0a0f18] border border-slate-900 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 md:p-8 space-y-6 relative custom-scrollbar">
+        </div> {/* VNP SIDE-BY-SIDE COMPARE MODAL */}
+      {isCompareModalOpen && api1 && api2 && (
+          <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-lg flex items-center justify-center p-4 md:p-6 overflow-y-auto">
+            <div className="bg-[#030712] border border-slate-900 rounded-3xl w-full max-w-5xl md:max-w-6xl max-h-[92vh] overflow-y-auto shadow-2xl p-6 md:p-10 space-y-8 relative custom-scrollbar">
               
               {/* Close Button */}
               <button
                 onClick={() => setIsCompareModalOpen(false)}
-                className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-100 bg-slate-900/80 border border-slate-800 hover:border-slate-700 rounded-xl hover:bg-slate-800 transition-all cursor-pointer"
+                className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-100 bg-slate-900/80 border border-slate-800 hover:border-slate-700 rounded-xl hover:bg-slate-800 transition-all cursor-pointer z-10"
                 title="Close Comparison"
               >
                 <X className="w-5 h-5" />
               </button>
 
               {/* Title Header */}
-              <div className="space-y-1">
-                <span className="text-[10px] text-emerald-400 font-mono uppercase tracking-widest flex items-center gap-1.5 font-bold">
-                  <GitCompare className="w-4 h-4 text-emerald-400" /> VNP PEER COMPARISON DESK
-                </span>
-                <h3 className="text-xl font-black text-slate-100 uppercase tracking-tight">Consensus Node Compare Sandbox</h3>
-                <p className="text-xs text-slate-400 leading-normal max-w-2xl">
-                  Analyze performance metrics, uptime stability, and protocol conformity between two prober nodes side-by-side to isolate anomalies or optimization fields.
+              <div className="space-y-2 border-b border-slate-900/60 pb-5">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg border border-emerald-500/20">
+                    <GitCompare className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] text-emerald-400 font-mono uppercase tracking-widest font-extrabold">VNP PEER COMPARISON DESK</span>
+                </div>
+                <h3 className="text-2xl font-black text-slate-100 uppercase tracking-tight">Consensus Node Compare Sandbox</h3>
+                <p className="text-xs text-slate-400 leading-relaxed max-w-3xl">
+                  Analyze performance latency latitudes, continuous SLA uptime stability, and core protocol configurations side-by-side. 
+                  This matrix isolates node anomalies and architectural efficiency under randomized telemetry conditions.
                 </p>
               </div>
 
               {/* Selectors Block */}
-              <div className="grid grid-cols-1 md:grid-cols-11 gap-4 items-center bg-slate-950 p-4 rounded-2xl border border-slate-900/60">
+              <div className="grid grid-cols-1 md:grid-cols-11 gap-4 items-center bg-slate-950/80 p-5 rounded-2xl border border-slate-900/80 shadow-inner">
                 
-                {/* Node 1 Selector */}
-                <div className="md:col-span-5 space-y-1">
-                  <label className="text-[10px] font-mono text-slate-500 uppercase font-bold">Node Candidate A</label>
+                {/* Node A Selector */}
+                <div className="md:col-span-5 space-y-1.5">
+                  <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider font-extrabold flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Candidate Node Alpha
+                  </span>
                   <select
                     value={compareApiId1}
                     onChange={(e) => setCompareApiId1(e.target.value)}
-                    className="w-full bg-[#0a0f18] border border-slate-900 rounded-xl p-3 text-sm text-slate-200 font-mono font-bold focus:outline-none focus:border-emerald-500/50"
+                    className="w-full bg-[#070b13] border border-slate-850 rounded-xl p-3 text-xs text-slate-200 font-mono font-bold focus:outline-none focus:border-emerald-500/50 cursor-pointer hover:border-slate-700 transition"
                   >
                     {calculatedApis.map((a) => (
                       <option key={a.id} value={a.id} disabled={a.id === compareApiId2}>
-                        {a.name} ({getBadgeGrade(a.compositeScore)})
+                        {a.name} (VNP: {a.compositeScore} — {getBadgeGrade(a.compositeScore)})
                       </option>
                     ))}
                   </select>
                 </div>
 
                 {/* VS Divider */}
-                <div className="md:col-span-1 flex flex-col items-center justify-center pt-2 md:pt-0">
-                  <span className="bg-slate-900 border border-slate-800 text-[10px] font-mono font-black text-slate-500 px-2.5 py-1 rounded-full flex items-center justify-center gap-1 shadow-inner">
+                <div className="md:col-span-1 flex flex-col items-center justify-center pt-2 md:pt-4">
+                  <span className="bg-[#0e1626] border border-slate-800 text-[10px] font-mono font-black text-emerald-400 px-3 py-1.5 rounded-full flex items-center justify-center gap-1 shadow-md">
                     VS
                   </span>
                 </div>
 
-                {/* Node 2 Selector */}
-                <div className="md:col-span-5 space-y-1">
-                  <label className="text-[10px] font-mono text-slate-500 uppercase font-bold">Node Candidate B</label>
+                {/* Node B Selector */}
+                <div className="md:col-span-5 space-y-1.5">
+                  <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider font-extrabold flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> Candidate Node Beta
+                  </span>
                   <select
                     value={compareApiId2}
                     onChange={(e) => setCompareApiId2(e.target.value)}
-                    className="w-full bg-[#0a0f18] border border-slate-900 rounded-xl p-3 text-sm text-slate-200 font-mono font-bold focus:outline-none focus:border-emerald-500/50"
+                    className="w-full bg-[#070b13] border border-slate-850 rounded-xl p-3 text-xs text-slate-200 font-mono font-bold focus:outline-none focus:border-emerald-500/50 cursor-pointer hover:border-slate-700 transition"
                   >
                     {calculatedApis.map((a) => (
                       <option key={a.id} value={a.id} disabled={a.id === compareApiId1}>
-                        {a.name} ({getBadgeGrade(a.compositeScore)})
+                        {a.name} (VNP: {a.compositeScore} — {getBadgeGrade(a.compositeScore)})
                       </option>
                     ))}
                   </select>
@@ -1079,144 +1082,204 @@ export default function BenchmarkPanel({ apis, trustBeacon, blockAnchored, onRef
               </div>
 
               {/* Side-by-Side Comparison Matrix */}
-              <div className="space-y-6">
+              <div className="space-y-8">
                 
                 {/* Core Header Row */}
-                <div className="grid grid-cols-2 gap-4 md:gap-8 border-b border-slate-900 pb-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   
                   {/* Candidate A Card */}
-                  <div className={`p-4 rounded-2xl border text-left flex flex-col justify-between h-full transition ${
+                  <div className={`p-6 rounded-2xl border text-left flex flex-col justify-between h-full transition relative overflow-hidden ${
                     api1.compositeScore >= api2.compositeScore
-                      ? "bg-[#0b1017] border-emerald-500/30 shadow-md shadow-emerald-950/5"
+                      ? "bg-slate-950/80 border-emerald-500/30 shadow-lg shadow-emerald-950/5"
                       : "bg-slate-950/40 border-slate-900"
                   }`}>
-                    <div className="space-y-1">
+                    {api1.compositeScore >= api2.compositeScore && (
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+                    )}
+                    <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase border text-emerald-400 bg-emerald-950/20 border-emerald-500/20">
-                          NODE A
+                        <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded uppercase border text-emerald-400 bg-emerald-950/20 border-emerald-500/20 tracking-wider">
+                          Candidate Alpha
                         </span>
                         {api1.compositeScore >= api2.compositeScore && (
-                          <span className="text-[9px] font-mono font-bold text-emerald-400 flex items-center gap-1">
-                            🏆 WINNER
+                          <span className="text-[9px] font-mono font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                            🏆 WINNER NODE
                           </span>
                         )}
                       </div>
-                      <h4 className="text-base font-black text-slate-200 mt-2 truncate">{api1.name}</h4>
-                      <p className="text-[10px] font-mono text-slate-500 truncate">{api1.id}</p>
+                      <h4 className="text-lg font-black text-slate-100 uppercase tracking-tight pt-2">{api1.name}</h4>
+                      <p className="text-[10px] font-mono text-slate-500 tracking-tight font-semibold truncate">{api1.id}</p>
                     </div>
 
-                    <div className="flex items-end justify-between mt-6 pt-3 border-t border-slate-900">
-                      <div className="space-y-0.5">
-                        <span className="text-[9px] font-mono text-slate-500 block uppercase font-bold">Composite VNP Score</span>
+                    <div className="flex items-end justify-between mt-8 pt-4 border-t border-slate-900/80">
+                      <div className="space-y-1 flex-1">
+                        <span className="text-[9px] font-mono text-slate-500 block uppercase font-bold tracking-wider">Composite Score</span>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-3xl font-black font-mono text-emerald-400 tracking-tighter">{api1.compositeScore}</span>
+                          <span className="text-4xl font-black font-mono text-emerald-400 tracking-tighter">{api1.compositeScore}</span>
                           <span className="text-slate-500 text-xs font-mono">/100</span>
                         </div>
+                        <div className="w-3/4 h-1 bg-slate-900 rounded-full mt-2 overflow-hidden">
+                          <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${api1.compositeScore}%` }} />
+                        </div>
                       </div>
-                      <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] uppercase font-mono px-2 py-1 rounded font-black">
-                        GRADE {getBadgeGrade(api1.compositeScore)}
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs uppercase font-mono px-3 py-1.5 rounded-lg font-black shadow-inner">
+                          Grade {getBadgeGrade(api1.compositeScore)}
+                        </span>
+                        <span className="text-[8px] font-mono text-slate-500 font-bold uppercase">{api1.stabilityRating}</span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Candidate B Card */}
-                  <div className={`p-4 rounded-2xl border text-left flex flex-col justify-between h-full transition ${
+                  <div className={`p-6 rounded-2xl border text-left flex flex-col justify-between h-full transition relative overflow-hidden ${
                     api2.compositeScore >= api1.compositeScore
-                      ? "bg-[#0b1017] border-emerald-500/30 shadow-md shadow-emerald-950/5"
+                      ? "bg-slate-950/80 border-emerald-500/30 shadow-lg shadow-emerald-950/5"
                       : "bg-slate-950/40 border-slate-900"
                   }`}>
-                    <div className="space-y-1">
+                    {api2.compositeScore >= api1.compositeScore && (
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+                    )}
+                    <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase border text-indigo-400 bg-indigo-950/20 border-indigo-500/20">
-                          NODE B
+                        <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded uppercase border text-indigo-400 bg-indigo-950/20 border-indigo-500/20 tracking-wider">
+                          Candidate Beta
                         </span>
                         {api2.compositeScore >= api1.compositeScore && (
-                          <span className="text-[9px] font-mono font-bold text-emerald-400 flex items-center gap-1">
-                            🏆 WINNER
+                          <span className="text-[9px] font-mono font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                            🏆 WINNER NODE
                           </span>
                         )}
                       </div>
-                      <h4 className="text-base font-black text-slate-200 mt-2 truncate">{api2.name}</h4>
-                      <p className="text-[10px] font-mono text-slate-500 truncate">{api2.id}</p>
+                      <h4 className="text-lg font-black text-slate-100 uppercase tracking-tight pt-2">{api2.name}</h4>
+                      <p className="text-[10px] font-mono text-slate-500 tracking-tight font-semibold truncate">{api2.id}</p>
                     </div>
 
-                    <div className="flex items-end justify-between mt-6 pt-3 border-t border-slate-900">
-                      <div className="space-y-0.5">
-                        <span className="text-[9px] font-mono text-slate-500 block uppercase font-bold">Composite VNP Score</span>
+                    <div className="flex items-end justify-between mt-8 pt-4 border-t border-slate-900/80">
+                      <div className="space-y-1 flex-1">
+                        <span className="text-[9px] font-mono text-slate-500 block uppercase font-bold tracking-wider">Composite Score</span>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-3xl font-black font-mono text-emerald-400 tracking-tighter">{api2.compositeScore}</span>
+                          <span className="text-4xl font-black font-mono text-emerald-400 tracking-tighter">{api2.compositeScore}</span>
                           <span className="text-slate-500 text-xs font-mono">/100</span>
                         </div>
+                        <div className="w-3/4 h-1 bg-slate-900 rounded-full mt-2 overflow-hidden">
+                          <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${api2.compositeScore}%` }} />
+                        </div>
                       </div>
-                      <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] uppercase font-mono px-2 py-1 rounded font-black">
-                        GRADE {getBadgeGrade(api2.compositeScore)}
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs uppercase font-mono px-3 py-1.5 rounded-lg font-black shadow-inner">
+                          Grade {getBadgeGrade(api2.compositeScore)}
+                        </span>
+                        <span className="text-[8px] font-mono text-slate-500 font-bold uppercase">{api2.stabilityRating}</span>
+                      </div>
                     </div>
                   </div>
 
                 </div>
 
                 {/* SLA Compliance and Features Table */}
-                <div className="space-y-2.5">
-                  <h4 className="text-xs font-mono text-slate-500 uppercase font-black tracking-wider border-b border-slate-900 pb-1.5">Compliance & Architecture</h4>
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-center gap-2 border-b border-slate-900 pb-2">
+                    <Sliders className="w-4 h-4 text-emerald-400" />
+                    <h4 className="text-xs font-mono text-slate-200 uppercase font-black tracking-widest">Architectural & Compliance Specifications</h4>
+                  </div>
                   
-                  {/* x402 compliance row */}
-                  <div className="grid grid-cols-2 gap-4 md:gap-8 items-center py-1">
-                    <div className="flex items-center justify-between bg-slate-950/30 p-2.5 rounded-xl border border-slate-900/40">
-                      <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">x402 Micropayments</span>
-                      <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded border uppercase ${
-                        api1.x402Ready 
-                          ? "text-emerald-400 bg-emerald-950/20 border-emerald-500/20" 
-                          : "text-slate-500 bg-slate-900 border-slate-800"
-                      }`}>
-                        {api1.x402Ready ? "Ready" : "Disabled"}
-                      </span>
+                  <div className="space-y-2">
+                    {/* x402 compliance row */}
+                    <div className="grid grid-cols-1 md:grid-cols-10 gap-4 p-4 items-center bg-slate-950/40 border border-slate-900/60 rounded-2xl hover:bg-slate-900/10 transition">
+                      <div className="md:col-span-4 flex items-center gap-3">
+                        <div className="p-2 bg-slate-900/80 rounded-lg text-emerald-400">
+                          <Zap className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h5 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-mono">x402 Micropayments</h5>
+                          <p className="text-[10px] text-slate-500 font-mono">Autonomous M2M payment settling capability</p>
+                        </div>
+                      </div>
+                      <div className="md:col-span-3 border-l md:border-l-0 md:pl-0 border-slate-900 pl-4">
+                        <span className={`text-[9px] font-mono font-bold px-2.5 py-1 rounded border uppercase ${
+                          api1.x402Ready 
+                            ? "text-emerald-400 bg-emerald-950/20 border-emerald-500/20" 
+                            : "text-slate-500 bg-slate-900 border-slate-800"
+                        }`}>
+                          {api1.x402Ready ? "Ready" : "Disabled"}
+                        </span>
+                      </div>
+                      <div className="md:col-span-3 border-l md:border-l-0 md:pl-0 border-slate-900 pl-4">
+                        <span className={`text-[9px] font-mono font-bold px-2.5 py-1 rounded border uppercase ${
+                          api2.x402Ready 
+                            ? "text-emerald-400 bg-emerald-950/20 border-emerald-500/20" 
+                            : "text-slate-500 bg-slate-900 border-slate-800"
+                        }`}>
+                          {api2.x402Ready ? "Ready" : "Disabled"}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between bg-slate-950/30 p-2.5 rounded-xl border border-slate-900/40">
-                      <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">x402 Micropayments</span>
-                      <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded border uppercase ${
-                        api2.x402Ready 
-                          ? "text-emerald-400 bg-emerald-950/20 border-emerald-500/20" 
-                          : "text-slate-500 bg-slate-900 border-slate-800"
-                      }`}>
-                        {api2.x402Ready ? "Ready" : "Disabled"}
-                      </span>
-                    </div>
-                  </div>
 
-                  {/* Version tag row */}
-                  <div className="grid grid-cols-2 gap-4 md:gap-8 items-center py-1">
-                    <div className="flex items-center justify-between bg-slate-950/30 p-2.5 rounded-xl border border-slate-900/40">
-                      <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Version Tag</span>
-                      <span className="text-[10px] font-mono font-bold text-slate-300">{api1.version}</span>
+                    {/* Version tag row */}
+                    <div className="grid grid-cols-1 md:grid-cols-10 gap-4 p-4 items-center bg-slate-950/40 border border-slate-900/60 rounded-2xl hover:bg-slate-900/10 transition">
+                      <div className="md:col-span-4 flex items-center gap-3">
+                        <div className="p-2 bg-slate-900/80 rounded-lg text-slate-400">
+                          <Terminal className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h5 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-mono">Version Release</h5>
+                          <p className="text-[10px] text-slate-500 font-mono">Current deployed semantic code iteration</p>
+                        </div>
+                      </div>
+                      <div className="md:col-span-3 border-l md:border-l-0 md:pl-0 border-slate-900 pl-4 font-mono text-sm text-slate-300 font-bold">
+                        {api1.version}
+                      </div>
+                      <div className="md:col-span-3 border-l md:border-l-0 md:pl-0 border-slate-900 pl-4 font-mono text-sm text-slate-300 font-bold">
+                        {api2.version}
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between bg-slate-950/30 p-2.5 rounded-xl border border-slate-900/40">
-                      <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Version Tag</span>
-                      <span className="text-[10px] font-mono font-bold text-slate-300">{api2.version}</span>
-                    </div>
-                  </div>
 
-                  {/* Rating description row */}
-                  <div className="grid grid-cols-2 gap-4 md:gap-8 items-center py-1">
-                    <div className="flex items-center justify-between bg-slate-950/30 p-2.5 rounded-xl border border-slate-900/40">
-                      <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Stability Profile</span>
-                      <span className="text-[10px] font-mono font-bold text-slate-300">{api1.stabilityRating}</span>
-                    </div>
-                    <div className="flex items-center justify-between bg-slate-950/30 p-2.5 rounded-xl border border-slate-900/40">
-                      <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Stability Profile</span>
-                      <span className="text-[10px] font-mono font-bold text-slate-300">{api2.stabilityRating}</span>
+                    {/* Rating description row */}
+                    <div className="grid grid-cols-1 md:grid-cols-10 gap-4 p-4 items-center bg-slate-950/40 border border-slate-900/60 rounded-2xl hover:bg-slate-900/10 transition">
+                      <div className="md:col-span-4 flex items-center gap-3">
+                        <div className="p-2 bg-slate-900/80 rounded-lg text-slate-400">
+                          <ShieldCheck className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h5 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-mono">Stability Profile</h5>
+                          <p className="text-[10px] text-slate-500 font-mono">Disaster recovery and network resilience level</p>
+                        </div>
+                      </div>
+                      <div className="md:col-span-3 border-l md:border-l-0 md:pl-0 border-slate-900 pl-4 font-mono text-xs text-slate-300 font-bold">
+                        {api1.stabilityRating}
+                      </div>
+                      <div className="md:col-span-3 border-l md:border-l-0 md:pl-0 border-slate-900 pl-4 font-mono text-xs text-slate-300 font-bold">
+                        {api2.stabilityRating}
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Latency Index Comparison Table */}
-                <div className="space-y-2.5">
-                  <h4 className="text-xs font-mono text-slate-500 uppercase font-black tracking-wider border-b border-slate-900 pb-1.5 flex items-center justify-between">
-                    <span>Latency Comparison (P99 tail latency)</span>
-                    <span className="text-[9px] text-emerald-400">Lower is better</span>
-                  </h4>
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-center justify-between border-b border-slate-900 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-emerald-400" />
+                      <h4 className="text-xs font-mono text-slate-200 uppercase font-black tracking-widest">Global Latency Latitudes (P99 Tail Latency)</h4>
+                    </div>
+                    <span className="text-[9px] text-emerald-400 font-mono tracking-wider font-bold">LOWER IS BETTER</span>
+                  </div>
                   
-                  <div className="space-y-2 font-mono text-[11px]">
+                  <div className="space-y-3 font-mono">
+                    {/* Header labels */}
+                    <div className="hidden md:grid grid-cols-10 gap-4 px-4 text-[9px] font-mono font-bold uppercase tracking-wider text-slate-500 pb-1 border-b border-slate-900/40">
+                      <div className="col-span-4">Monitored Region / Location</div>
+                      <div className="col-span-3 flex items-center justify-between">
+                        <span className="truncate">Alpha Node: {api1.name}</span>
+                        <span className="text-[8px] bg-slate-900 border border-slate-800 px-1 py-0.2 rounded font-normal text-slate-400 font-mono flex-shrink-0">CANDIDATE 1</span>
+                      </div>
+                      <div className="col-span-3 flex items-center justify-between">
+                        <span className="truncate">Beta Node: {api2.name}</span>
+                        <span className="text-[8px] bg-slate-900 border border-slate-800 px-1 py-0.2 rounded font-normal text-slate-400 font-mono flex-shrink-0">CANDIDATE 2</span>
+                      </div>
+                    </div>
+
                     {(Object.keys(api1.regions) as Array<keyof typeof api1.regions>).map((reg) => {
                       const lat1 = api1.regions[reg].p99;
                       const lat2 = api2.regions[reg].p99;
@@ -1224,40 +1287,47 @@ export default function BenchmarkPanel({ apis, trustBeacon, blockAnchored, onRef
                       const isWinner2 = lat2 <= lat1;
                       const diffPct = Math.round(Math.abs((lat1 - lat2) / Math.max(1, lat1)) * 100);
 
-                      let regLabel = "US East";
-                      if (reg === "us-west") regLabel = "US West";
-                      if (reg === "eu-west") regLabel = "Europe West";
-                      if (reg === "ap-southeast") regLabel = "Asia SE";
-                      if (reg === "ap-northeast") regLabel = "Asia NE";
+                      let regLabel = "US East (Virginia)";
+                      if (reg === "us-west") regLabel = "US West (Oregon)";
+                      if (reg === "eu-west") regLabel = "Europe West (Amsterdam)";
+                      if (reg === "ap-southeast") regLabel = "Asia SE (Singapore)";
+                      if (reg === "ap-northeast") regLabel = "Asia NE (Tokyo)";
 
                       return (
-                        <div key={reg} className="bg-slate-950 p-2.5 rounded-xl border border-slate-900 flex flex-col md:flex-row md:items-center justify-between gap-2">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase w-24">{regLabel}</span>
-                          
-                          <div className="grid grid-cols-2 gap-4 md:gap-8 flex-1">
-                            {/* Candidate A value */}
-                            <div className="flex items-center justify-between">
-                              <span className={`font-bold ${isWinner1 ? "text-emerald-400 font-black" : "text-slate-400"}`}>
-                                {lat1} ms
-                              </span>
-                              {isWinner1 && lat1 !== lat2 && (
-                                <span className="text-[9px] bg-emerald-950/30 text-emerald-400 border border-emerald-500/10 px-1.5 py-0.2 rounded font-extrabold uppercase">
-                                  -{diffPct}% Fast
-                                </span>
-                              )}
+                        <div key={reg} className="grid grid-cols-1 md:grid-cols-10 gap-4 p-4 items-center bg-slate-950/40 border border-slate-900/60 rounded-2xl hover:bg-slate-900/10 transition">
+                          {/* Region Details */}
+                          <div className="md:col-span-4 flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800/80 flex items-center justify-center text-[10px] font-extrabold text-slate-300">
+                              {reg === "us-east" ? "UE" : reg === "us-west" ? "UW" : reg === "eu-west" ? "EW" : reg === "ap-southeast" ? "AS" : "AN"}
                             </div>
+                            <div>
+                              <h5 className="text-xs font-bold text-slate-100 uppercase font-sans tracking-wide">{regLabel}</h5>
+                              <span className="text-[9px] text-slate-500 font-mono uppercase tracking-widest font-extrabold">{reg}</span>
+                            </div>
+                          </div>
 
-                            {/* Candidate B value */}
-                            <div className="flex items-center justify-between">
-                              <span className={`font-bold ${isWinner2 ? "text-emerald-400 font-black" : "text-slate-400"}`}>
-                                {lat2} ms
+                          {/* Candidate A value */}
+                          <div className="md:col-span-3 flex items-center justify-between border-l md:border-l-0 md:pl-0 border-slate-900 pl-4">
+                            <span className={`text-sm font-bold ${isWinner1 ? "text-emerald-400 font-black" : "text-slate-400"}`}>
+                              {lat1} ms
+                            </span>
+                            {isWinner1 && lat1 !== lat2 && (
+                              <span className="text-[8px] bg-emerald-950/40 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-black tracking-wide">
+                                -{diffPct}% FAST
                               </span>
-                              {isWinner2 && lat1 !== lat2 && (
-                                <span className="text-[9px] bg-emerald-950/30 text-emerald-400 border border-emerald-500/10 px-1.5 py-0.2 rounded font-extrabold uppercase">
-                                  -{diffPct}% Fast
-                                </span>
-                              )}
-                            </div>
+                            )}
+                          </div>
+
+                          {/* Candidate B value */}
+                          <div className="md:col-span-3 flex items-center justify-between border-l md:border-l-0 md:pl-0 border-slate-900 pl-4">
+                            <span className={`text-sm font-bold ${isWinner2 ? "text-indigo-400 font-black" : "text-slate-400"}`}>
+                              {lat2} ms
+                            </span>
+                            {isWinner2 && lat1 !== lat2 && (
+                              <span className="text-[8px] bg-indigo-950/40 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded font-black tracking-wide">
+                                -{diffPct}% FAST
+                              </span>
+                            )}
                           </div>
                         </div>
                       );
@@ -1266,49 +1336,72 @@ export default function BenchmarkPanel({ apis, trustBeacon, blockAnchored, onRef
                 </div>
 
                 {/* Uptime Stability Comparison Table */}
-                <div className="space-y-2.5">
-                  <h4 className="text-xs font-mono text-slate-500 uppercase font-black tracking-wider border-b border-slate-900 pb-1.5 flex items-center justify-between">
-                    <span>Uptime & Stability Index</span>
-                    <span className="text-[9px] text-emerald-400">Higher is better</span>
-                  </h4>
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-center justify-between border-b border-slate-900 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-emerald-400" />
+                      <h4 className="text-xs font-mono text-slate-200 uppercase font-black tracking-widest">Global SLA Stability & Uptime Index</h4>
+                    </div>
+                    <span className="text-[9px] text-emerald-400 font-mono tracking-wider font-bold">HIGHER IS BETTER</span>
+                  </div>
 
-                  <div className="space-y-2 font-mono text-[11px]">
+                  <div className="space-y-3 font-mono">
+                    {/* Header labels */}
+                    <div className="hidden md:grid grid-cols-10 gap-4 px-4 text-[9px] font-mono font-bold uppercase tracking-wider text-slate-500 pb-1 border-b border-slate-900/40">
+                      <div className="col-span-4">Monitored Region / Location</div>
+                      <div className="col-span-3 flex items-center justify-between">
+                        <span className="truncate">Alpha Node: {api1.name}</span>
+                        <span className="text-[8px] bg-slate-900 border border-slate-800 px-1 py-0.2 rounded font-normal text-slate-400 font-mono flex-shrink-0">CANDIDATE 1</span>
+                      </div>
+                      <div className="col-span-3 flex items-center justify-between">
+                        <span className="truncate">Beta Node: {api2.name}</span>
+                        <span className="text-[8px] bg-slate-900 border border-slate-800 px-1 py-0.2 rounded font-normal text-slate-400 font-mono flex-shrink-0">CANDIDATE 2</span>
+                      </div>
+                    </div>
+
                     {(Object.keys(api1.regions) as Array<keyof typeof api1.regions>).map((reg) => {
                       const upt1 = api1.regions[reg].uptime;
                       const upt2 = api2.regions[reg].uptime;
                       const isWinner1 = upt1 >= upt2;
                       const isWinner2 = upt2 >= upt1;
 
-                      let regLabel = "US East";
-                      if (reg === "us-west") regLabel = "US West";
-                      if (reg === "eu-west") regLabel = "Europe West";
-                      if (reg === "ap-southeast") regLabel = "Asia SE";
-                      if (reg === "ap-northeast") regLabel = "Asia NE";
+                      let regLabel = "US East (Virginia)";
+                      if (reg === "us-west") regLabel = "US West (Oregon)";
+                      if (reg === "eu-west") regLabel = "Europe West (Amsterdam)";
+                      if (reg === "ap-southeast") regLabel = "Asia SE (Singapore)";
+                      if (reg === "ap-northeast") regLabel = "Asia NE (Tokyo)";
 
                       return (
-                        <div key={reg} className="bg-slate-950 p-2.5 rounded-xl border border-slate-900 flex flex-col md:flex-row md:items-center justify-between gap-2">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase w-24">{regLabel}</span>
-
-                          <div className="grid grid-cols-2 gap-4 md:gap-8 flex-1">
-                            {/* Candidate A value */}
-                            <div className="flex items-center justify-between">
-                              <span className={`font-bold ${isWinner1 ? "text-emerald-400 font-black" : "text-slate-400"}`}>
-                                {upt1.toFixed(2)}%
-                              </span>
-                              {isWinner1 && upt1 !== upt2 && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                              )}
+                        <div key={reg} className="grid grid-cols-1 md:grid-cols-10 gap-4 p-4 items-center bg-slate-950/40 border border-slate-900/60 rounded-2xl hover:bg-slate-900/10 transition">
+                          {/* Region Details */}
+                          <div className="md:col-span-4 flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800/80 flex items-center justify-center text-[10px] font-extrabold text-slate-300">
+                              {reg === "us-east" ? "UE" : reg === "us-west" ? "UW" : reg === "eu-west" ? "EW" : reg === "ap-southeast" ? "AS" : "AN"}
                             </div>
-
-                            {/* Candidate B value */}
-                            <div className="flex items-center justify-between">
-                              <span className={`font-bold ${isWinner2 ? "text-emerald-400 font-black" : "text-slate-400"}`}>
-                                {upt2.toFixed(2)}%
-                              </span>
-                              {isWinner2 && upt1 !== upt2 && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                              )}
+                            <div>
+                              <h5 className="text-xs font-bold text-slate-100 uppercase font-sans tracking-wide">{regLabel}</h5>
+                              <span className="text-[9px] text-slate-500 font-mono uppercase tracking-widest font-extrabold">{reg}</span>
                             </div>
+                          </div>
+
+                          {/* Candidate A value */}
+                          <div className="md:col-span-3 flex items-center justify-between border-l md:border-l-0 md:pl-0 border-slate-900 pl-4">
+                            <span className={`text-sm font-bold ${isWinner1 ? "text-emerald-400 font-black" : "text-slate-400"}`}>
+                              {upt1.toFixed(2)}%
+                            </span>
+                            {isWinner1 && (
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            )}
+                          </div>
+
+                          {/* Candidate B value */}
+                          <div className="md:col-span-3 flex items-center justify-between border-l md:border-l-0 md:pl-0 border-slate-900 pl-4">
+                            <span className={`text-sm font-bold ${isWinner2 ? "text-indigo-400 font-black" : "text-slate-400"}`}>
+                              {upt2.toFixed(2)}%
+                            </span>
+                            {isWinner2 && (
+                              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                            )}
                           </div>
                         </div>
                       );
@@ -1317,8 +1410,8 @@ export default function BenchmarkPanel({ apis, trustBeacon, blockAnchored, onRef
                 </div>
 
                 {/* AI / Operational Verdict block */}
-                <div className="p-4 bg-emerald-950/10 border border-emerald-500/25 rounded-2xl space-y-1.5">
-                  <span className="text-[9px] font-mono font-bold text-emerald-400 uppercase tracking-widest block">System Consensus Verdict</span>
+                <div className="p-5 bg-emerald-950/10 border border-emerald-500/25 rounded-2xl space-y-2">
+                  <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-widest block">System Consensus Verdict</span>
                   <p className="text-[11px] text-slate-300 leading-relaxed font-mono">
                     {api1.compositeScore > api2.compositeScore + 2 
                       ? `Node "${api1.name}" demonstrates a clear architectural advantage with an overall composite rating outperforming "${api2.name}" by ${(api1.compositeScore - api2.compositeScore).toFixed(1)} points. It excels particularly in global lower tail-latencies. Recommended for high-priority routing.`
@@ -1331,10 +1424,8 @@ export default function BenchmarkPanel({ apis, trustBeacon, blockAnchored, onRef
               </div>
             </div>
           </div>
-        );
-      })()}
+        )}
 
-      </div>
     </div>
   );
 }

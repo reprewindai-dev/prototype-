@@ -30,9 +30,10 @@ import RbacPanel from "./components/RbacPanel";
 import AiAdvisorPanel from "./components/AiAdvisorPanel";
 import NetworkTopologyPanel from "./components/NetworkTopologyPanel";
 import LoadTestingPanel from "./components/LoadTestingPanel";
+import AgentSdkPanel from "./components/AgentSdkPanel";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"benchmark" | "k8s" | "spec" | "rbac" | "alerts" | "advisor" | "topology" | "loadtest">("topology");
+  const [activeTab, setActiveTab] = useState<"benchmark" | "k8s" | "spec" | "rbac" | "alerts" | "advisor" | "topology" | "loadtest" | "agentsdk">("topology");
   
   // States loaded from backend REST Endpoints
   const [apis, setApis] = useState<ApiState[]>([]);
@@ -493,6 +494,18 @@ export default function App() {
                 <Cpu className="w-4 h-4 text-emerald-400" />
                 <span>AI Consult</span>
               </button>
+
+              <button
+                onClick={() => setActiveTab("agentsdk")}
+                className={`flex-1 min-w-[130px] flex items-center justify-center gap-2 p-3.5 rounded-xl font-extrabold transition-all border cursor-pointer select-none ${
+                  activeTab === "agentsdk"
+                    ? "bg-[#101622] border-amber-500/50 text-amber-400 shadow-md"
+                    : "bg-transparent border-transparent text-slate-400 hover:bg-slate-950/50 hover:text-white"
+                }`}
+              >
+                <Terminal className="w-4 h-4 text-amber-500 animate-pulse" />
+                <span>Agent SDK - Python</span>
+              </button>
             </div>
 
             {/* Tab Viewport Workspace with Transition wrapper */}
@@ -547,6 +560,8 @@ export default function App() {
                     )}
 
                     {activeTab === "advisor" && <AiAdvisorPanel />}
+
+                    {activeTab === "agentsdk" && <AgentSdkPanel />}
                   </motion.div>
                 </AnimatePresence>
               )}
