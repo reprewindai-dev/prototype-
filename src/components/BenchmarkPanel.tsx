@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Award, Globe, Activity, ShieldCheck, HardDrive, Cpu, Terminal, Anchor, Server, Layers, ArrowRight, Sliders, Check, Zap } from "lucide-react";
+import { Award, Globe, Activity, ShieldCheck, HardDrive, Cpu, Terminal, Anchor, Server, Layers, ArrowRight, Sliders, Check, Zap, GitCompare, X } from "lucide-react";
 import { ApiState, RegionMetric } from "../types";
 
 interface BenchmarkPanelProps {
@@ -169,6 +169,10 @@ function VnpRadarChart({ score, apiId, x402Ready }: { score: number; apiId: stri
 
 export default function BenchmarkPanel({ apis, trustBeacon, blockAnchored, onRefreshTelemetry }: BenchmarkPanelProps) {
   const [selectedApiId, setSelectedApiId] = useState<string>("did:vnp:api:veklom-sovereign-ai");
+  const [statusFilter, setStatusFilter] = useState<"All" | "Healthy" | "Warning" | "Critical">("All");
+  const [isCompareModalOpen, setIsCompareModalOpen] = useState<boolean>(false);
+  const [compareApiId1, setCompareApiId1] = useState<string>("");
+  const [compareApiId2, setCompareApiId2] = useState<string>("");
 
   // Custom API form states
   const [apiName, setApiName] = useState("");
@@ -233,6 +237,27 @@ export default function BenchmarkPanel({ apis, trustBeacon, blockAnchored, onRef
     ...api,
     compositeScore: getRecalculatedScore(api)
   }));
+
+  const getApiStatus = (score: number) => {
+    if (score >= 90) return "Healthy";
+    if (score >= 80) return "Warning";
+    return "Critical";
+  };
+
+  const apisWithStatus = calculatedApis.map(api => ({
+    ...api,
+    status: getApiStatus(api.compositeScore)
+  }));
+
+  const countAll = apisWithStatus.length;
+  const countHealthy = apisWithStatus.filter(api => api.status === "Healthy").length;
+  const countWarning = apisWithStatus.filter(api => api.status === "Warning").length;
+  const countCritical = apisWithStatus.filter(api => api.status === "Critical").length;
+
+  const filteredApis = apisWithStatus.filter(api => {
+    if (statusFilter === "All") return true;
+    return api.status === statusFilter;
+  });
 
   const selectedApi = calculatedApis.find(api => api.id === selectedApiId) || calculatedApis[0];
 
@@ -441,54 +466,154 @@ export default function BenchmarkPanel({ apis, trustBeacon, blockAnchored, onRef
 
       </div>
 
-      {/* Grid of verified APIs */}
-      <h3 className="text-xs font-mono tracking-wider font-extrabold text-slate-500 uppercase px-1">
-        Consensus Peer Verified API Nodes ({calculatedApis.length}) {weightTuned && <span className="text-emerald-400 italic font-mono lowercase">(recalculated weights active)</span>}
-      </h3>
+      {/* Grid of verified APIs and Filter Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-900/60 pb-3 px-1">
+        <div className="space-y-0.5">
+          <h3 className="text-xs font-mono tracking-wider font-extrabold text-slate-400 uppercase flex items-center gap-1.5">
+            <Server className="w-3.5 h-3.5 text-slate-500" />
+            <span>Consensus Peer Verified API Nodes ({filteredApis.length})</span>
+            {weightTuned && <span className="text-emerald-400 italic font-mono lowercase font-normal">(recalculated weights active)</span>}
+          </h3>
+          <p className="text-[10px] text-slate-500 font-mono">
+            Isolate network bottlenecks or consensus anomalies across peer probers.
+          </p>
+        </div>
+
+        {/* Filter Bar & Compare Button */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => {
+              setCompareApiId1(selectedApiId || calculatedApis[0]?.id || "");
+              setCompareApiId2(calculatedApis.find(a => a.id !== (selectedApiId || calculatedApis[0]?.id))?.id || calculatedApis[1]?.id || "");
+              setIsCompareModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold transition-all cursor-pointer shadow-sm"
+          >
+            <GitCompare className="w-3.5 h-3.5" />
+            <span>Compare Nodes</span>
+          </button>
+
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-900">
+          <button
+            onClick={() => setStatusFilter("All")}
+            className={`px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer ${
+              statusFilter === "All"
+                ? "bg-slate-900 text-slate-100 border border-slate-800"
+                : "text-slate-500 hover:text-slate-300 border border-transparent"
+            }`}
+          >
+            All ({countAll})
+          </button>
+          <button
+            onClick={() => setStatusFilter("Healthy")}
+            className={`px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              statusFilter === "Healthy"
+                ? "bg-[#0b1b16] text-emerald-400 border border-emerald-500/20"
+                : "text-slate-500 hover:text-emerald-400 border border-transparent"
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            Healthy ({countHealthy})
+          </button>
+          <button
+            onClick={() => setStatusFilter("Warning")}
+            className={`px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              statusFilter === "Warning"
+                ? "bg-[#1f1b10] text-amber-400 border border-amber-500/20"
+                : "text-slate-500 hover:text-amber-400 border border-transparent"
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+            Warning ({countWarning})
+          </button>
+          <button
+            onClick={() => setStatusFilter("Critical")}
+            className={`px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              statusFilter === "Critical"
+                ? "bg-[#251214] text-red-400 border border-red-500/20"
+                : "text-slate-500 hover:text-red-400 border border-transparent"
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+            Critical ({countCritical})
+          </button>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {calculatedApis.map((api) => {
-          const isSelected = api.id === selectedApiId;
-          const grade = getBadgeGrade(api.compositeScore);
-          
-          return (
-            <div
-              key={api.id}
-              onClick={() => setSelectedApiId(api.id)}
-              className={`p-5 rounded-2xl border text-left cursor-pointer transition-all duration-300 relative select-none group flex flex-col justify-between ${
-                isSelected
-                  ? "bg-[#0b1017] border-emerald-500/60 shadow-xl shadow-emerald-950/15"
-                  : "bg-slate-950/80 border-slate-900 hover:border-slate-800/80 hover:bg-[#0c1119]/50"
-              }`}
+        {filteredApis.length === 0 ? (
+          <div className="col-span-1 md:col-span-2 p-10 bg-slate-950 border border-slate-900 rounded-2xl text-center space-y-2 flex flex-col items-center justify-center">
+            <Activity className="w-8 h-8 text-slate-700 animate-pulse" />
+            <p className="text-xs font-mono text-slate-400 uppercase font-bold">
+              No API Nodes match the '{statusFilter}' filter
+            </p>
+            <p className="text-[10px] text-slate-600 font-mono">
+              Adjust the consensus weights above or register a new custom node to test status boundaries.
+            </p>
+            <button
+              onClick={() => setStatusFilter("All")}
+              className="mt-2 px-3 py-1 bg-slate-900 hover:bg-slate-800 text-slate-300 text-[9px] font-mono rounded-lg border border-slate-800 transition cursor-pointer"
             >
-              {/* Highlight background glow */}
-              <div className={`absolute top-0 right-1/4 w-32 h-16 rounded-full filter blur-[40px] opacity-[0.03] pointer-events-none transition-all ${isSelected ? "bg-emerald-500 opacity-[0.07]" : "bg-transparent"}`} />
+              Reset Filter
+            </button>
+          </div>
+        ) : (
+          filteredApis.map((api) => {
+            const isSelected = api.id === selectedApiId;
+            const grade = getBadgeGrade(api.compositeScore);
+            
+            return (
+              <div
+                key={api.id}
+                onClick={() => setSelectedApiId(api.id)}
+                className={`p-5 rounded-2xl border text-left cursor-pointer transition-all duration-300 relative select-none group flex flex-col justify-between ${
+                  isSelected
+                    ? "bg-[#0b1017] border-emerald-500/60 shadow-xl shadow-emerald-950/15"
+                    : "bg-slate-950/80 border-slate-900 hover:border-slate-800/80 hover:bg-[#0c1119]/50"
+                }`}
+              >
+                {/* Highlight background glow */}
+                <div className={`absolute top-0 right-1/4 w-32 h-16 rounded-full filter blur-[40px] opacity-[0.03] pointer-events-none transition-all ${isSelected ? "bg-emerald-500 opacity-[0.07]" : "bg-transparent"}`} />
 
-              <div>
-                {/* Header Row */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="space-y-0.5">
-                    <span className="text-[9px] tracking-widest font-mono text-slate-500 block uppercase font-bold">
-                      VEKLOM ● {api.x402Ready ? "PROTOCOL NORMALIZATION" : "MULTI-AGENT CONSENSUS"}
-                    </span>
-                    <h4 className="text-base font-extrabold text-slate-100 group-hover:text-emerald-300 transition duration-150">
-                      {api.name}
-                    </h4>
-                    <span className="text-[10px] text-slate-500 font-mono block max-w-[280px] truncate">
-                      {api.id}
-                    </span>
-                  </div>
+                <div>
+                  {/* Header Row */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <span className="text-[9px] tracking-widest font-mono text-slate-500 block uppercase font-bold">
+                        VEKLOM ● {api.x402Ready ? "PROTOCOL NORMALIZATION" : "MULTI-AGENT CONSENSUS"}
+                      </span>
+                      <h4 className="text-base font-extrabold text-slate-100 group-hover:text-emerald-300 transition duration-150">
+                        {api.name}
+                      </h4>
+                      <span className="text-[10px] text-slate-500 font-mono block max-w-[280px] truncate">
+                        {api.id}
+                      </span>
+                    </div>
 
-                  {/* Rating Grade & Score Badge */}
-                  <div className="flex items-stretch gap-1">
-                    <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] uppercase font-mono px-2 py-1 rounded font-extrabold flex items-center">
-                      {grade}
-                    </span>
-                    <span className="text-2xl font-black font-mono text-emerald-400 tracking-tighter pl-1">
-                      {api.compositeScore}
-                    </span>
+                    {/* Rating Grade, Score Badge & Status Badge */}
+                    <div className="flex flex-col items-end gap-1.5">
+                      <div className="flex items-stretch gap-1">
+                        <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] uppercase font-mono px-2 py-1 rounded font-extrabold flex items-center">
+                          {grade}
+                        </span>
+                        <span className="text-2xl font-black font-mono text-emerald-400 tracking-tighter pl-1">
+                          {api.compositeScore}
+                        </span>
+                      </div>
+                      <span className={`text-[8.5px] font-mono font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider flex items-center gap-1 ${
+                        api.status === "Healthy" 
+                          ? "text-emerald-400 bg-emerald-950/20 border-emerald-500/30" 
+                          : api.status === "Warning" 
+                          ? "text-amber-400 bg-amber-950/20 border-amber-500/30" 
+                          : "text-red-400 bg-red-950/20 border-red-500/30"
+                      }`}>
+                        <span className={`w-1 h-1 rounded-full ${
+                          api.status === "Healthy" ? "bg-emerald-400" : api.status === "Warning" ? "bg-amber-400" : "bg-red-400 animate-pulse"
+                        }`} />
+                        {api.status}
+                      </span>
+                    </div>
                   </div>
-                </div>
 
                 {/* SVG Octagonal Radar Section with Sweeper */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center mt-5 mb-4">
@@ -519,37 +644,52 @@ export default function BenchmarkPanel({ apis, trustBeacon, blockAnchored, onRef
               </div>
 
               {/* Geographical indicators strip */}
-              <div className="pt-3.5 border-t border-slate-900 flex items-center justify-between gap-1 mt-auto">
-                <span className="text-[9px] text-slate-500 font-mono tracking-wider font-extrabold uppercase">
-                  Regions monitored:
-                </span>
+              <div className="pt-3.5 border-t border-slate-900 flex items-center justify-between gap-2 mt-auto">
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] text-slate-500 font-mono tracking-wider font-extrabold uppercase">
+                    Regions:
+                  </span>
 
-                <div className="flex items-center gap-1">
-                  {(Object.keys(api.regions) as Array<keyof typeof api.regions>).map((reg) => {
-                    const rData = api.regions[reg];
-                    
-                    // Simple short letters corresponding to regions
-                    let shortLetter = "UE";
-                    if (reg === "us-west") shortLetter = "UW";
-                    if (reg === "eu-west") shortLetter = "EW";
-                    if (reg === "ap-southeast") shortLetter = "AS";
-                    if (reg === "ap-northeast") shortLetter = "AN";
+                  <div className="flex items-center gap-1">
+                    {(Object.keys(api.regions) as Array<keyof typeof api.regions>).map((reg) => {
+                      const rData = api.regions[reg];
+                      
+                      // Simple short letters corresponding to regions
+                      let shortLetter = "UE";
+                      if (reg === "us-west") shortLetter = "UW";
+                      if (reg === "eu-west") shortLetter = "EW";
+                      if (reg === "ap-southeast") shortLetter = "AS";
+                      if (reg === "ap-northeast") shortLetter = "AN";
 
-                    return (
-                      <span
-                        key={reg}
-                        title={`${reg.toUpperCase()}: ${rData.p99}ms, ${rData.uptime}% stability`}
-                        className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded font-mono border ${getRegionHighlighter(rData.p99)}`}
-                      >
-                        {shortLetter}
-                      </span>
-                    );
-                  })}
+                      return (
+                        <span
+                          key={reg}
+                          title={`${reg.toUpperCase()}: ${rData.p99}ms, ${rData.uptime}% stability`}
+                          className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded font-mono border ${getRegionHighlighter(rData.p99)}`}
+                        >
+                          {shortLetter}
+                        </span>
+                      );
+                    })}
+                  </div>
                 </div>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent selecting the main card
+                    setCompareApiId1(api.id);
+                    setCompareApiId2(selectedApiId !== api.id ? selectedApiId : (calculatedApis.find(a => a.id !== api.id)?.id || ""));
+                    setIsCompareModalOpen(true);
+                  }}
+                  className="px-2.5 py-1 bg-slate-900/80 hover:bg-emerald-950/40 hover:text-emerald-400 hover:border-emerald-500/30 text-slate-400 text-[8.5px] font-mono font-bold rounded border border-slate-800 transition-all cursor-pointer flex items-center gap-1"
+                >
+                  <GitCompare className="w-2.5 h-2.5" />
+                  <span>Compare</span>
+                </button>
               </div>
             </div>
           );
-        })}
+        }) )}
       </div>
 
       {/* Selected Node Geographic Expansion Panel */}
@@ -860,6 +1000,339 @@ export default function BenchmarkPanel({ apis, trustBeacon, blockAnchored, onRef
             )}
           </div>
         </div>
+
+      </div>
+
+      {/* VNP SIDE-BY-SIDE COMPARE MODAL */}
+      {isCompareModalOpen && (() => {
+        const api1 = calculatedApis.find(a => a.id === compareApiId1) || calculatedApis[0];
+        const api2 = calculatedApis.find(a => a.id === compareApiId2) || calculatedApis[1] || calculatedApis[0];
+
+        if (!api1 || !api2) return null;
+
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 md:p-6 overflow-y-auto">
+            <div className="bg-[#0a0f18] border border-slate-900 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 md:p-8 space-y-6 relative custom-scrollbar">
+              
+              {/* Close Button */}
+              <button
+                onClick={() => setIsCompareModalOpen(false)}
+                className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-100 bg-slate-900/80 border border-slate-800 hover:border-slate-700 rounded-xl hover:bg-slate-800 transition-all cursor-pointer"
+                title="Close Comparison"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {/* Title Header */}
+              <div className="space-y-1">
+                <span className="text-[10px] text-emerald-400 font-mono uppercase tracking-widest flex items-center gap-1.5 font-bold">
+                  <GitCompare className="w-4 h-4 text-emerald-400" /> VNP PEER COMPARISON DESK
+                </span>
+                <h3 className="text-xl font-black text-slate-100 uppercase tracking-tight">Consensus Node Compare Sandbox</h3>
+                <p className="text-xs text-slate-400 leading-normal max-w-2xl">
+                  Analyze performance metrics, uptime stability, and protocol conformity between two prober nodes side-by-side to isolate anomalies or optimization fields.
+                </p>
+              </div>
+
+              {/* Selectors Block */}
+              <div className="grid grid-cols-1 md:grid-cols-11 gap-4 items-center bg-slate-950 p-4 rounded-2xl border border-slate-900/60">
+                
+                {/* Node 1 Selector */}
+                <div className="md:col-span-5 space-y-1">
+                  <label className="text-[10px] font-mono text-slate-500 uppercase font-bold">Node Candidate A</label>
+                  <select
+                    value={compareApiId1}
+                    onChange={(e) => setCompareApiId1(e.target.value)}
+                    className="w-full bg-[#0a0f18] border border-slate-900 rounded-xl p-3 text-sm text-slate-200 font-mono font-bold focus:outline-none focus:border-emerald-500/50"
+                  >
+                    {calculatedApis.map((a) => (
+                      <option key={a.id} value={a.id} disabled={a.id === compareApiId2}>
+                        {a.name} ({getBadgeGrade(a.compositeScore)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* VS Divider */}
+                <div className="md:col-span-1 flex flex-col items-center justify-center pt-2 md:pt-0">
+                  <span className="bg-slate-900 border border-slate-800 text-[10px] font-mono font-black text-slate-500 px-2.5 py-1 rounded-full flex items-center justify-center gap-1 shadow-inner">
+                    VS
+                  </span>
+                </div>
+
+                {/* Node 2 Selector */}
+                <div className="md:col-span-5 space-y-1">
+                  <label className="text-[10px] font-mono text-slate-500 uppercase font-bold">Node Candidate B</label>
+                  <select
+                    value={compareApiId2}
+                    onChange={(e) => setCompareApiId2(e.target.value)}
+                    className="w-full bg-[#0a0f18] border border-slate-900 rounded-xl p-3 text-sm text-slate-200 font-mono font-bold focus:outline-none focus:border-emerald-500/50"
+                  >
+                    {calculatedApis.map((a) => (
+                      <option key={a.id} value={a.id} disabled={a.id === compareApiId1}>
+                        {a.name} ({getBadgeGrade(a.compositeScore)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+              </div>
+
+              {/* Side-by-Side Comparison Matrix */}
+              <div className="space-y-6">
+                
+                {/* Core Header Row */}
+                <div className="grid grid-cols-2 gap-4 md:gap-8 border-b border-slate-900 pb-5">
+                  
+                  {/* Candidate A Card */}
+                  <div className={`p-4 rounded-2xl border text-left flex flex-col justify-between h-full transition ${
+                    api1.compositeScore >= api2.compositeScore
+                      ? "bg-[#0b1017] border-emerald-500/30 shadow-md shadow-emerald-950/5"
+                      : "bg-slate-950/40 border-slate-900"
+                  }`}>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase border text-emerald-400 bg-emerald-950/20 border-emerald-500/20">
+                          NODE A
+                        </span>
+                        {api1.compositeScore >= api2.compositeScore && (
+                          <span className="text-[9px] font-mono font-bold text-emerald-400 flex items-center gap-1">
+                            🏆 WINNER
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="text-base font-black text-slate-200 mt-2 truncate">{api1.name}</h4>
+                      <p className="text-[10px] font-mono text-slate-500 truncate">{api1.id}</p>
+                    </div>
+
+                    <div className="flex items-end justify-between mt-6 pt-3 border-t border-slate-900">
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] font-mono text-slate-500 block uppercase font-bold">Composite VNP Score</span>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-3xl font-black font-mono text-emerald-400 tracking-tighter">{api1.compositeScore}</span>
+                          <span className="text-slate-500 text-xs font-mono">/100</span>
+                        </div>
+                      </div>
+                      <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] uppercase font-mono px-2 py-1 rounded font-black">
+                        GRADE {getBadgeGrade(api1.compositeScore)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Candidate B Card */}
+                  <div className={`p-4 rounded-2xl border text-left flex flex-col justify-between h-full transition ${
+                    api2.compositeScore >= api1.compositeScore
+                      ? "bg-[#0b1017] border-emerald-500/30 shadow-md shadow-emerald-950/5"
+                      : "bg-slate-950/40 border-slate-900"
+                  }`}>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase border text-indigo-400 bg-indigo-950/20 border-indigo-500/20">
+                          NODE B
+                        </span>
+                        {api2.compositeScore >= api1.compositeScore && (
+                          <span className="text-[9px] font-mono font-bold text-emerald-400 flex items-center gap-1">
+                            🏆 WINNER
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="text-base font-black text-slate-200 mt-2 truncate">{api2.name}</h4>
+                      <p className="text-[10px] font-mono text-slate-500 truncate">{api2.id}</p>
+                    </div>
+
+                    <div className="flex items-end justify-between mt-6 pt-3 border-t border-slate-900">
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] font-mono text-slate-500 block uppercase font-bold">Composite VNP Score</span>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-3xl font-black font-mono text-emerald-400 tracking-tighter">{api2.compositeScore}</span>
+                          <span className="text-slate-500 text-xs font-mono">/100</span>
+                        </div>
+                      </div>
+                      <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] uppercase font-mono px-2 py-1 rounded font-black">
+                        GRADE {getBadgeGrade(api2.compositeScore)}
+                      </span>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* SLA Compliance and Features Table */}
+                <div className="space-y-2.5">
+                  <h4 className="text-xs font-mono text-slate-500 uppercase font-black tracking-wider border-b border-slate-900 pb-1.5">Compliance & Architecture</h4>
+                  
+                  {/* x402 compliance row */}
+                  <div className="grid grid-cols-2 gap-4 md:gap-8 items-center py-1">
+                    <div className="flex items-center justify-between bg-slate-950/30 p-2.5 rounded-xl border border-slate-900/40">
+                      <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">x402 Micropayments</span>
+                      <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded border uppercase ${
+                        api1.x402Ready 
+                          ? "text-emerald-400 bg-emerald-950/20 border-emerald-500/20" 
+                          : "text-slate-500 bg-slate-900 border-slate-800"
+                      }`}>
+                        {api1.x402Ready ? "Ready" : "Disabled"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between bg-slate-950/30 p-2.5 rounded-xl border border-slate-900/40">
+                      <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">x402 Micropayments</span>
+                      <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded border uppercase ${
+                        api2.x402Ready 
+                          ? "text-emerald-400 bg-emerald-950/20 border-emerald-500/20" 
+                          : "text-slate-500 bg-slate-900 border-slate-800"
+                      }`}>
+                        {api2.x402Ready ? "Ready" : "Disabled"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Version tag row */}
+                  <div className="grid grid-cols-2 gap-4 md:gap-8 items-center py-1">
+                    <div className="flex items-center justify-between bg-slate-950/30 p-2.5 rounded-xl border border-slate-900/40">
+                      <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Version Tag</span>
+                      <span className="text-[10px] font-mono font-bold text-slate-300">{api1.version}</span>
+                    </div>
+                    <div className="flex items-center justify-between bg-slate-950/30 p-2.5 rounded-xl border border-slate-900/40">
+                      <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Version Tag</span>
+                      <span className="text-[10px] font-mono font-bold text-slate-300">{api2.version}</span>
+                    </div>
+                  </div>
+
+                  {/* Rating description row */}
+                  <div className="grid grid-cols-2 gap-4 md:gap-8 items-center py-1">
+                    <div className="flex items-center justify-between bg-slate-950/30 p-2.5 rounded-xl border border-slate-900/40">
+                      <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Stability Profile</span>
+                      <span className="text-[10px] font-mono font-bold text-slate-300">{api1.stabilityRating}</span>
+                    </div>
+                    <div className="flex items-center justify-between bg-slate-950/30 p-2.5 rounded-xl border border-slate-900/40">
+                      <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Stability Profile</span>
+                      <span className="text-[10px] font-mono font-bold text-slate-300">{api2.stabilityRating}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Latency Index Comparison Table */}
+                <div className="space-y-2.5">
+                  <h4 className="text-xs font-mono text-slate-500 uppercase font-black tracking-wider border-b border-slate-900 pb-1.5 flex items-center justify-between">
+                    <span>Latency Comparison (P99 tail latency)</span>
+                    <span className="text-[9px] text-emerald-400">Lower is better</span>
+                  </h4>
+                  
+                  <div className="space-y-2 font-mono text-[11px]">
+                    {(Object.keys(api1.regions) as Array<keyof typeof api1.regions>).map((reg) => {
+                      const lat1 = api1.regions[reg].p99;
+                      const lat2 = api2.regions[reg].p99;
+                      const isWinner1 = lat1 <= lat2;
+                      const isWinner2 = lat2 <= lat1;
+                      const diffPct = Math.round(Math.abs((lat1 - lat2) / Math.max(1, lat1)) * 100);
+
+                      let regLabel = "US East";
+                      if (reg === "us-west") regLabel = "US West";
+                      if (reg === "eu-west") regLabel = "Europe West";
+                      if (reg === "ap-southeast") regLabel = "Asia SE";
+                      if (reg === "ap-northeast") regLabel = "Asia NE";
+
+                      return (
+                        <div key={reg} className="bg-slate-950 p-2.5 rounded-xl border border-slate-900 flex flex-col md:flex-row md:items-center justify-between gap-2">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase w-24">{regLabel}</span>
+                          
+                          <div className="grid grid-cols-2 gap-4 md:gap-8 flex-1">
+                            {/* Candidate A value */}
+                            <div className="flex items-center justify-between">
+                              <span className={`font-bold ${isWinner1 ? "text-emerald-400 font-black" : "text-slate-400"}`}>
+                                {lat1} ms
+                              </span>
+                              {isWinner1 && lat1 !== lat2 && (
+                                <span className="text-[9px] bg-emerald-950/30 text-emerald-400 border border-emerald-500/10 px-1.5 py-0.2 rounded font-extrabold uppercase">
+                                  -{diffPct}% Fast
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Candidate B value */}
+                            <div className="flex items-center justify-between">
+                              <span className={`font-bold ${isWinner2 ? "text-emerald-400 font-black" : "text-slate-400"}`}>
+                                {lat2} ms
+                              </span>
+                              {isWinner2 && lat1 !== lat2 && (
+                                <span className="text-[9px] bg-emerald-950/30 text-emerald-400 border border-emerald-500/10 px-1.5 py-0.2 rounded font-extrabold uppercase">
+                                  -{diffPct}% Fast
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Uptime Stability Comparison Table */}
+                <div className="space-y-2.5">
+                  <h4 className="text-xs font-mono text-slate-500 uppercase font-black tracking-wider border-b border-slate-900 pb-1.5 flex items-center justify-between">
+                    <span>Uptime & Stability Index</span>
+                    <span className="text-[9px] text-emerald-400">Higher is better</span>
+                  </h4>
+
+                  <div className="space-y-2 font-mono text-[11px]">
+                    {(Object.keys(api1.regions) as Array<keyof typeof api1.regions>).map((reg) => {
+                      const upt1 = api1.regions[reg].uptime;
+                      const upt2 = api2.regions[reg].uptime;
+                      const isWinner1 = upt1 >= upt2;
+                      const isWinner2 = upt2 >= upt1;
+
+                      let regLabel = "US East";
+                      if (reg === "us-west") regLabel = "US West";
+                      if (reg === "eu-west") regLabel = "Europe West";
+                      if (reg === "ap-southeast") regLabel = "Asia SE";
+                      if (reg === "ap-northeast") regLabel = "Asia NE";
+
+                      return (
+                        <div key={reg} className="bg-slate-950 p-2.5 rounded-xl border border-slate-900 flex flex-col md:flex-row md:items-center justify-between gap-2">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase w-24">{regLabel}</span>
+
+                          <div className="grid grid-cols-2 gap-4 md:gap-8 flex-1">
+                            {/* Candidate A value */}
+                            <div className="flex items-center justify-between">
+                              <span className={`font-bold ${isWinner1 ? "text-emerald-400 font-black" : "text-slate-400"}`}>
+                                {upt1.toFixed(2)}%
+                              </span>
+                              {isWinner1 && upt1 !== upt2 && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                              )}
+                            </div>
+
+                            {/* Candidate B value */}
+                            <div className="flex items-center justify-between">
+                              <span className={`font-bold ${isWinner2 ? "text-emerald-400 font-black" : "text-slate-400"}`}>
+                                {upt2.toFixed(2)}%
+                              </span>
+                              {isWinner2 && upt1 !== upt2 && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* AI / Operational Verdict block */}
+                <div className="p-4 bg-emerald-950/10 border border-emerald-500/25 rounded-2xl space-y-1.5">
+                  <span className="text-[9px] font-mono font-bold text-emerald-400 uppercase tracking-widest block">System Consensus Verdict</span>
+                  <p className="text-[11px] text-slate-300 leading-relaxed font-mono">
+                    {api1.compositeScore > api2.compositeScore + 2 
+                      ? `Node "${api1.name}" demonstrates a clear architectural advantage with an overall composite rating outperforming "${api2.name}" by ${(api1.compositeScore - api2.compositeScore).toFixed(1)} points. It excels particularly in global lower tail-latencies. Recommended for high-priority routing.`
+                      : api2.compositeScore > api1.compositeScore + 2
+                      ? `Node "${api2.name}" holds the consensus quality standard over "${api1.name}" by ${(api2.compositeScore - api1.compositeScore).toFixed(1)} score points. Uptime and error rates are optimal across monitored entry points.`
+                      : `Both "${api1.name}" and "${api2.name}" are running neck-and-neck inside the acceptable multi-region SLA variance window (difference of < 2.0). Both represent top-tier candidates for secure routing and decentralized attestation.`}
+                  </p>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       </div>
     </div>
