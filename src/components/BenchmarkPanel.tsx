@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Award, Globe, Activity, ShieldCheck, HardDrive, Cpu, Terminal, Anchor, Server, Layers, ArrowRight, Sliders, Check, Zap, GitCompare, X } from "lucide-react";
+import { Award, Globe, Activity, ShieldCheck, HardDrive, Cpu, Terminal, Anchor, Server, Layers, ArrowRight, Sliders, Check, Zap, GitCompare, X, Search, AlertTriangle, RefreshCw } from "lucide-react";
 import { ApiState, RegionMetric } from "../types";
 
 interface BenchmarkPanelProps {
@@ -170,9 +170,14 @@ function VnpRadarChart({ score, apiId, x402Ready }: { score: number; apiId: stri
 export default function BenchmarkPanel({ apis, trustBeacon, blockAnchored, onRefreshTelemetry }: BenchmarkPanelProps) {
   const [selectedApiId, setSelectedApiId] = useState<string>("did:vnp:api:veklom-sovereign-ai");
   const [statusFilter, setStatusFilter] = useState<"All" | "Healthy" | "Warning" | "Critical">("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedRegion, setSelectedRegion] = useState<string>("All");
+  const [minScore, setMinScore] = useState<number>(0);
+  const [maxScore, setMaxScore] = useState<number>(100);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState<boolean>(false);
   const [compareApiId1, setCompareApiId1] = useState<string>("");
   const [compareApiId2, setCompareApiId2] = useState<string>("");
+  const [isCheckingStatus, setIsCheckingStatus] = useState<boolean>(false);
 
   // Custom API form states
   const [apiName, setApiName] = useState("");
@@ -255,8 +260,66 @@ export default function BenchmarkPanel({ apis, trustBeacon, blockAnchored, onRef
   const countCritical = apisWithStatus.filter(api => api.status === "Critical").length;
 
   const filteredApis = apisWithStatus.filter(api => {
-    if (statusFilter === "All") return true;
-    return api.status === statusFilter;
+    // 1. Status Filter
+    if (statusFilter !== "All" && api.status !== statusFilter) return false;
+
+    // 2. Global Search query filtering
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      
+      // Let's check name match
+      const nameMatch = api.name.toLowerCase().includes(q) || api.id.toLowerCase().includes(q);
+      
+      // Let's check region match (is q contained in region key like us-east or region full names/labels like "us west")
+      const regionMatch = Object.keys(api.regions).some(regKey => {
+        const keyLower = regKey.toLowerCase();
+        let fullName = "";
+        if (regKey === "us-east") fullName = "us east";
+        if (regKey === "us-west") fullName = "us west";
+        if (regKey === "eu-west") fullName = "eu west";
+        if (regKey === "ap-southeast") fullName = "ap southeast";
+        if (regKey === "ap-northeast") fullName = "ap northeast";
+        return keyLower.includes(q) || fullName.includes(q);
+      });
+
+      // Let's check if the query is a score range like "80-90" or mathematical like ">85" or "<95" or just a number
+      let matchesScoreRange = false;
+      const numMatch = q.match(/^([><=]=?)\s*(\d+)$/);
+      const rangeMatch = q.match(/^(\d+)\s*-\s*(\d+)$/);
+      if (numMatch) {
+        const op = numMatch[1];
+        const val = parseFloat(numMatch[2]);
+        if (op === ">" && api.compositeScore > val) matchesScoreRange = true;
+        if (op === ">=" && api.compositeScore >= val) matchesScoreRange = true;
+        if (op === "<" && api.compositeScore < val) matchesScoreRange = true;
+        if (op === "<=" && api.compositeScore <= val) matchesScoreRange = true;
+        if ((op === "=" || op === "==") && api.compositeScore === val) matchesScoreRange = true;
+      } else if (rangeMatch) {
+        const minVal = parseFloat(rangeMatch[1]);
+        const maxVal = parseFloat(rangeMatch[2]);
+        if (api.compositeScore >= minVal && api.compositeScore <= maxVal) matchesScoreRange = true;
+      } else if (!isNaN(Number(q))) {
+        const exactNum = parseFloat(q);
+        if (Math.abs(api.compositeScore - exactNum) < 5) matchesScoreRange = true;
+      }
+
+      if (!nameMatch && !regionMatch && !matchesScoreRange) {
+        return false;
+      }
+    }
+
+    // 3. Score Range Inputs
+    if (api.compositeScore < minScore || api.compositeScore > maxScore) {
+      return false;
+    }
+
+    // 4. Region select dropdown (filters by having a healthy or responsive latency in that region)
+    if (selectedRegion !== "All") {
+      const regData = api.regions[selectedRegion as keyof typeof api.regions];
+      if (!regData || regData.p99 > 1500) return false; // filters out severely degraded regions
+    }
+
+    return true;
   });
 
   const selectedApi = calculatedApis.find(api => api.id === selectedApiId) || calculatedApis[0];
@@ -544,22 +607,209 @@ export default function BenchmarkPanel({ apis, trustBeacon, blockAnchored, onRef
       </div>
     </div>
 
+      {/* Global Search and Multi-Criteria Filtering Hub */}
+      <div id="vnp-api-search-filtering-hub" className="bg-[#0b1017] border border-slate-900 rounded-2xl p-4 space-y-4 shadow-md">
+        <div className="flex flex-col lg:flex-row gap-3">
+          {/* Main search bar */}
+          <div className="relative flex-1">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+              <Search className="w-4 h-4 text-slate-500" />
+            </span>
+            <input
+              id="vnp-global-search-input"
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name, ID, region (e.g. 'us-west'), or query range (e.g. '>90', '80-95')..."
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500/80 font-mono"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-slate-300"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Region filter dropdown */}
+          <div className="w-full lg:w-48">
+            <select
+              id="vnp-region-filter-select"
+              value={selectedRegion}
+              onChange={(e) => setSelectedRegion(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-emerald-500/80 font-mono"
+            >
+              <option value="All">All Regions</option>
+              <option value="us-east">US East (us-east)</option>
+              <option value="us-west">US West (us-west)</option>
+              <option value="eu-west">EU West (eu-west)</option>
+              <option value="ap-southeast">AP Southeast (ap-southeast)</option>
+              <option value="ap-northeast">AP Northeast (ap-northeast)</option>
+            </select>
+          </div>
+
+          {/* Score Range controls */}
+          <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-400 font-mono">
+            <span className="text-[10px] uppercase font-bold text-slate-500 whitespace-nowrap">Score Range:</span>
+            <input
+              id="vnp-min-score-input"
+              type="number"
+              min="0"
+              max="100"
+              value={minScore}
+              onChange={(e) => setMinScore(Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
+              className="w-12 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-center text-slate-200 focus:outline-none"
+            />
+            <span>to</span>
+            <input
+              id="vnp-max-score-input"
+              type="number"
+              min="0"
+              max="100"
+              value={maxScore}
+              onChange={(e) => setMaxScore(Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
+              className="w-12 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-center text-slate-200 focus:outline-none"
+            />
+            {(minScore > 0 || maxScore < 100 || selectedRegion !== "All" || searchQuery) && (
+              <button
+                onClick={() => {
+                  setSearchQuery("");
+                  setSelectedRegion("All");
+                  setMinScore(0);
+                  setMaxScore(100);
+                }}
+                className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold ml-2 underline"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Quick Suggestion Chips */}
+        <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-slate-500">
+          <span className="font-bold uppercase text-[9px] text-slate-600">Quick Searches:</span>
+          {[
+            { label: "Veklom", query: "Veklom" },
+            { label: "US West", query: "us-west" },
+            { label: "EU West", query: "eu-west" },
+            { label: "High Score (>90)", query: ">90" },
+            { label: "Mid Score (80-90)", query: "80-90" }
+          ].map((chip) => (
+            <button
+              key={chip.label}
+              onClick={() => {
+                if (chip.query.startsWith(">") || chip.query.includes("-")) {
+                  setSearchQuery(chip.query);
+                } else if (["us-east", "us-west", "eu-west", "ap-southeast", "ap-northeast"].includes(chip.query)) {
+                  setSelectedRegion(chip.query);
+                } else {
+                  setSearchQuery(chip.query);
+                }
+              }}
+              className="bg-slate-950 hover:bg-slate-900 text-slate-400 hover:text-slate-200 px-2 py-0.5 rounded-lg border border-slate-900 hover:border-slate-800 transition cursor-pointer"
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {filteredApis.length === 0 ? (
-          <div className="col-span-1 md:col-span-2 p-10 bg-slate-950 border border-slate-900 rounded-2xl text-center space-y-2 flex flex-col items-center justify-center">
-            <Activity className="w-8 h-8 text-slate-700 animate-pulse" />
-            <p className="text-xs font-mono text-slate-400 uppercase font-bold">
-              No API Nodes match the '{statusFilter}' filter
-            </p>
-            <p className="text-[10px] text-slate-600 font-mono">
-              Adjust the consensus weights above or register a new custom node to test status boundaries.
-            </p>
-            <button
-              onClick={() => setStatusFilter("All")}
-              className="mt-2 px-3 py-1 bg-slate-900 hover:bg-slate-800 text-slate-300 text-[9px] font-mono rounded-lg border border-slate-800 transition cursor-pointer"
-            >
-              Reset Filter
-            </button>
+          <div id="vnp-search-empty-state" className="col-span-1 md:col-span-2 p-12 bg-[#0b1017] border border-slate-900 rounded-3xl text-center flex flex-col items-center justify-center space-y-6 shadow-xl relative overflow-hidden">
+            {/* Highlight glowing elements */}
+            <div className="absolute top-0 right-1/4 w-32 h-16 rounded-full filter blur-[40px] bg-amber-500/5 pointer-events-none" />
+            <div className="absolute bottom-0 left-1/4 w-32 h-16 rounded-full filter blur-[40px] bg-emerald-500/5 pointer-events-none" />
+
+            {/* Interactive Warning/Search Icon */}
+            <div className="w-16 h-16 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center text-amber-500/90 shadow-inner relative">
+              <AlertTriangle className="w-7 h-7 text-amber-500 animate-pulse" />
+              <div className="absolute inset-0 rounded-full bg-amber-500/5 animate-ping" />
+            </div>
+
+            {/* Empty State Heading and Description */}
+            <div className="space-y-2 max-w-md">
+              <h4 className="text-sm font-extrabold text-slate-200 uppercase tracking-widest font-mono">
+                No Peer API Nodes Match Your Search Criteria
+              </h4>
+              <p className="text-[11px] text-slate-400 font-sans leading-relaxed">
+                Your current query constraints, region exclusions, or status parameters returned zero nodes in our active telemetry index.
+              </p>
+            </div>
+
+            {/* Active Filters Diagnostic Panel */}
+            <div className="flex flex-col items-center space-y-2 max-w-lg w-full bg-slate-950/80 p-4 rounded-2xl border border-slate-900/60 font-mono text-[10px]">
+              <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Currently Active Filters:</span>
+              <div className="flex flex-wrap justify-center gap-1.5">
+                {searchQuery && (
+                  <span className="bg-slate-900 border border-slate-800 text-slate-300 px-2.5 py-1 rounded-full flex items-center gap-1">
+                    <span className="text-slate-500">Query:</span> "{searchQuery}"
+                  </span>
+                )}
+                {selectedRegion !== "All" && (
+                  <span className="bg-slate-900 border border-slate-800 text-slate-300 px-2.5 py-1 rounded-full flex items-center gap-1">
+                    <span className="text-slate-500">Region:</span> {selectedRegion}
+                  </span>
+                )}
+                {(minScore > 0 || maxScore < 100) && (
+                  <span className="bg-slate-900 border border-slate-800 text-slate-300 px-2.5 py-1 rounded-full flex items-center gap-1">
+                    <span className="text-slate-500">Score Range:</span> {minScore} - {maxScore}
+                  </span>
+                )}
+                {statusFilter !== "All" && (
+                  <span className="bg-slate-900 border border-slate-800 text-slate-300 px-2.5 py-1 rounded-full flex items-center gap-1">
+                    <span className="text-slate-500">Status:</span> {statusFilter}
+                  </span>
+                )}
+                {!searchQuery && selectedRegion === "All" && minScore === 0 && maxScore === 100 && statusFilter === "All" && (
+                  <span className="text-slate-600 italic">No active filters applied</span>
+                )}
+              </div>
+            </div>
+
+            {/* Action buttons (Reset & Check Status) */}
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <button
+                id="vnp-btn-reset-all-filters"
+                onClick={() => {
+                  setSearchQuery("");
+                  setSelectedRegion("All");
+                  setMinScore(0);
+                  setMaxScore(100);
+                  setStatusFilter("All");
+                }}
+                className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-tr from-amber-600 to-indigo-700 hover:from-amber-500 hover:to-indigo-600 text-white text-[11px] font-bold font-mono rounded-xl border border-amber-500/20 transition-all cursor-pointer shadow-md select-none"
+              >
+                Reset All Active Filters
+              </button>
+
+              <button
+                id="vnp-btn-check-monitoring-status"
+                onClick={() => {
+                  if (onRefreshTelemetry) {
+                    setIsCheckingStatus(true);
+                    onRefreshTelemetry();
+                    setTimeout(() => setIsCheckingStatus(false), 1200);
+                  }
+                }}
+                className="w-full sm:w-auto px-5 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-[11px] font-bold font-mono rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer select-none"
+              >
+                {isCheckingStatus ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                    <span>Synchronizing Live Telemetry...</span>
+                  </>
+                ) : (
+                  <>
+                    <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Check Monitoring Status</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         ) : (
           filteredApis.map((api) => {
